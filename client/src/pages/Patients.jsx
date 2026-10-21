@@ -13,7 +13,7 @@ export default function Patients(){
 
   const add=async(e)=>{
     e.preventDefault();
-    await API.post('/patients',form);
+    await API.post('/patients',{...form,gender:form.gender.toLowerCase(),age:form.age?Number(form.age):undefined});
     setForm({name:'',age:'',gender:'Male',phone:'',address:'',bloodGroup:''});
     load();
   };

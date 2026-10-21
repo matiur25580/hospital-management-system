@@ -9,8 +9,8 @@ export default function Login(){
     e.preventDefault(); setErr('');
     try{
       const {data}=await api.post('/auth/login',{email,password});
-      localStorage.setItem('token',data.token);
-      localStorage.setItem('user',JSON.stringify(data.user));
+      sessionStorage.setItem('token',data.token);
+      sessionStorage.setItem('user',JSON.stringify(data.user));
       nav('/dashboard');
     }catch(e){ setErr(e.response?.data?.message||'Login failed'); }
   };

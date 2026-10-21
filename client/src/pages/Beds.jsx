@@ -4,7 +4,7 @@ import API from '../api';
 export default function Beds(){
   const [beds,setBeds]=useState([]);
   const [patients,setPatients]=useState([]);
-  const [form,setForm]=useState({bedNo:'',ward:'',type:'general'});
+  const [form,setForm]=useState({bedNo:'',ward:'',type:'General'});
   const [assign,setAssign]=useState({});
 
   const load=async()=>{
@@ -15,8 +15,8 @@ export default function Beds(){
 
   const add=async(e)=>{
     e.preventDefault();
-    await API.post('/beds',form);
-    setForm({bedNo:'',ward:'',type:'general'});
+    await API.post('/beds',{bedNo:form.bedNo,ward:form.ward});
+    setForm({bedNo:'',ward:''});
     load();
   };
   const doAssign=async(id)=>{
@@ -35,16 +35,13 @@ export default function Beds(){
       <h2 style={{color:'#1e293b'}}>Bed Management</h2>
       <form onSubmit={add} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:20,background:'#fff',padding:16,borderRadius:12}}>
         <input placeholder="Bed No" value={form.bedNo} onChange={e=>setForm({...form,bedNo:e.target.value})} required style={inp}/>
-        <input placeholder="Ward" value={form.ward} onChange={e=>setForm({...form,ward:e.target.value})} required style={inp}/>
-        <select value={form.type} onChange={e=>setForm({...form,type:e.target.value})} style={inp}>
-          <option value="general">General</option><option value="icu">ICU</option><option value="emergency">Emergency</option>
-        </select>
+        <select value={form.ward} onChange={e=>setForm({...form,ward:e.target.value})} required style={inp}><option value="">Select Ward</option><option value="General">General</option><option value="ICU">ICU</option><option value="Emergency">Emergency</option><option value="Cabin">Cabin</option></select>
         <button type="submit" style={{gridColumn:'1/-1',padding:10,background:'#2563eb',color:'#fff',border:'none',borderRadius:8,fontWeight:600}}>Add Bed</button>
       </form>
       {beds.map(b=>(
         <div key={b._id} style={{background:'#fff',padding:12,borderRadius:10,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
-            <b style={{color:'#1e293b'}}>{b.bedNo} — {b.ward} ({b.type})</b>
+            <b style={{color:'#1e293b'}}>{b.bedNo} — {b.ward} </b>
             <div style={{fontSize:13,color:b.status==='available'?'#16a34a':'#ef4444',fontWeight:600}}>
               {b.status==='available' ? 'Available' : 'Occupied by '+b.patient?.name}
             </div>

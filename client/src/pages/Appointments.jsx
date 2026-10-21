@@ -46,7 +46,7 @@ export default function Appointments(){
         <div key={a._id} style={{background:'#fff',padding:12,borderRadius:10,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
             <b style={{color:'#1e293b'}}>Token #{a.tokenNo} — {a.patient?.name}</b>
-            <div style={{fontSize:13,color:'#64748b'}}>Dr. {a.doctor?.name} | {a.date?.slice(0,10)} | {a.status}</div>
+            <div style={{fontSize:13,color:'#64748b'}}>{a.doctor?.name?.startsWith('Dr.')?a.doctor.name:'Dr. '+a.doctor?.name} | {a.date?.slice(0,10)} | {a.status}</div>
           </div>
           <div style={{display:'flex',gap:6}}>
             <button onClick={()=>setStatus(a._id,'completed')} style={btn('#16a34a')}>Done</button>
