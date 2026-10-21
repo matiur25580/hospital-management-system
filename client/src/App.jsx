@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Patients from './pages/Patients';
 
 function Protected({children}){
   const token=localStorage.getItem('token');
@@ -11,7 +12,8 @@ export default function App(){
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login/>} />
-        <Route path="/dashboard" element={<Protected><Dashboard/></Protected>} />
+        <Route path="/patients" element={<Patients/>}/>
+      <Route path="/dashboard" element={<Protected><Dashboard/></Protected>} />
       </Routes>
     </BrowserRouter>
   );

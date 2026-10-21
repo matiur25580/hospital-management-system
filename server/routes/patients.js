@@ -15,4 +15,11 @@ router.get('/', protect, async (req,res)=>{
   const patients = await Patient.find().sort({createdAt:-1});
   res.json(patients);
 });
+
+router.delete('/:id', protect, async (req,res)=>{
+  try{
+    await Patient.findByIdAndDelete(req.params.id);
+    res.json({message:'Patient deleted'});
+  }catch(e){ res.status(500).json({message:e.message}); }
+});
 module.exports = router;
