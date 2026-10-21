@@ -9,7 +9,10 @@ export default function Dashboard(){
   },[]);
   return (
   <div style={{minHeight:'100vh',background:'#f1f5f9',padding:24}}>
-    <h1 style={{color:"#1e293b"}}>Welcome, {user.name} ({user.role})</h1>
+    <div style={{marginBottom:16}}>
+        <h1 style={{color:"#1e293b",margin:0}}>Welcome, {user.name}</h1>
+        <span style={{background:"#dbeafe",color:"#1d4ed8",padding:"4px 12px",borderRadius:12,fontSize:13,fontWeight:600}}>{user.role}</span>
+      </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16,marginTop:20}}>
       <div style={{background:'#fff',padding:20,borderRadius:10}}><h3 style={{color:"#64748b",margin:0,fontSize:14}}>Total Patients</h3><h2 style={{color:"#0f172a",margin:"8px 0 0",fontSize:36}}>{stats.patients}</h2></div>
       <div style={{background:'#fff',padding:20,borderRadius:10}}><h3 style={{color:"#64748b",margin:0,fontSize:14}}>Total Doctors</h3><h2 style={{color:"#0f172a",margin:"8px 0 0",fontSize:36}}>{stats.doctors}</h2></div>
