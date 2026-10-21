@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Patients from './pages/Patients';
 import Appointments from './pages/Appointments';
+import Beds from './pages/Beds';
 
 function Protected({children}){
   const token=localStorage.getItem('token');
@@ -13,7 +14,8 @@ export default function App(){
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login/>} />
-        <Route path="/appointments" element={<Appointments/>}/>
+        <Route path="/beds" element={<Beds/>}/>
+      <Route path="/appointments" element={<Appointments/>}/>
       <Route path="/patients" element={<Patients/>}/>
       <Route path="/dashboard" element={<Protected><Dashboard/></Protected>} />
       </Routes>

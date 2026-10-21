@@ -14,4 +14,11 @@ router.patch('/:id/assign', protect, async (req,res)=>{
   const bed = await Bed.findByIdAndUpdate(req.params.id, {patient: req.body.patientId, status:'occupied'}, {new:true});
   res.json(bed);
 });
+
+router.patch('/:id/discharge', protect, async (req,res)=>{
+  try{
+    const bed = await Bed.findByIdAndUpdate(req.params.id, {patient: null, status:'available'}, {new:true});
+    res.json(bed);
+  }catch(e){ res.status(500).json({message:e.message}); }
+});
 module.exports = router;
