@@ -6,7 +6,7 @@ router.get('/', protect, async (req,res)=>{
   const beds = await Bed.find().populate('patient');
   res.json(beds);
 });
-router.post('/', protect, authorize('admin'), async (req,res)=>{
+router.post('/', protect, authorize('Admin'), async (req,res)=>{
   const bed = await Bed.create(req.body);
   res.status(201).json(bed);
 });
