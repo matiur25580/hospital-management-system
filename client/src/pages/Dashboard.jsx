@@ -16,7 +16,22 @@ export default function Dashboard(){
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:16,marginTop:20}}>
       <div style={{background:'#fff',padding:20,borderRadius:10}}><h3 style={{color:"#64748b",margin:0,fontSize:14}}>Total Patients</h3><h2 style={{color:"#0f172a",margin:"8px 0 0",fontSize:36}}>{stats.patients}</h2></div>
       <div style={{background:'#fff',padding:20,borderRadius:10}}><h3 style={{color:"#64748b",margin:0,fontSize:14}}>Total Doctors</h3><h2 style={{color:"#0f172a",margin:"8px 0 0",fontSize:36}}>{stats.doctors}</h2></div>
-      <div style={{background:'#fff',padding:20,borderRadius:10}}><h3 style={{color:"#64748b",margin:0,fontSize:14}}>Appointments</h3><h2 style={{color:"#0f172a",margin:"8px 0 0",fontSize:36}}>{stats.appointments}</h2></div>
+      <div style={{display:'flex',gap:12,marginTop:20,flexWrap:'wrap'}}>
+        {user.role==='admin' && <>
+          <Link to="/patients" style={lnk('#2563eb')}>Patients</Link>
+          <Link to="/appointments" style={lnk('#16a34a')}>Appointments</Link>
+          <Link to="/beds" style={lnk('#7c3aed')}>Beds</Link>
+        </>}
+        {user.role==='doctor' && <>
+          <Link to="/appointments" style={lnk('#16a34a')}>My Appointments</Link>
+          <Link to="/patients" style={lnk('#2563eb')}>Patients</Link>
+        </>}
+        {user.role==='receptionist' && <>
+          <Link to="/patients" style={lnk('#2563eb')}>Patients</Link>
+          <Link to="/appointments" style={lnk('#16a34a')}>Appointments</Link>
+          <Link to="/beds" style={lnk('#7c3aed')}>Beds</Link>
+        </>}
+      </div>
     </div>
     <button onClick={()=>{localStorage.clear();location.href='/';}} style={{marginTop:20,padding:'8px 16px'}}>Logout</button>
   </div>);
