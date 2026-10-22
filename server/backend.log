@@ -7,3 +7,22 @@ Server running on port 5000
 [0mPOST /api/auth/login [33m404[0m 7.927 ms - 58[0m
 [0mPOST /api/auth/send-otp [33m400[0m 10.524 ms - 54[0m
 [0mPOST /api/auth/send-otp [33m404[0m 7.906 ms - 58[0m
+Error: Invalid login: 535-5.7.8 Username and Password not accepted. For more information, go to
+535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2ea7b36fb92sm947725ad.38 - gsmtp
+    at SMTPConnection._formatError (/workspaces/hospital-management-system/server/node_modules/nodemailer/dist/cjs/smtp-connection/index.js:952:19)
+    at SMTPConnection._actionAUTHComplete (/workspaces/hospital-management-system/server/node_modules/nodemailer/dist/cjs/smtp-connection/index.js:1796:34)
+    at SMTPConnection.<anonymous> (/workspaces/hospital-management-system/server/node_modules/nodemailer/dist/cjs/smtp-connection/index.js:650:26)
+    at SMTPConnection._processResponse (/workspaces/hospital-management-system/server/node_modules/nodemailer/dist/cjs/smtp-connection/index.js:1181:20)
+    at SMTPConnection._onData (/workspaces/hospital-management-system/server/node_modules/nodemailer/dist/cjs/smtp-connection/index.js:897:14)
+    at SMTPConnection._onSocketData (/workspaces/hospital-management-system/server/node_modules/nodemailer/dist/cjs/smtp-connection/index.js:216:44)
+    at TLSSocket.emit (node:events:514:28)
+    at addChunk (node:internal/streams/readable:568:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:519:3)
+    at Readable.push (node:internal/streams/readable:399:5) {
+  code: 'EAUTH',
+  response: '535-5.7.8 Username and Password not accepted. For more information, go to\n' +
+    '535 5.7.8  https://support.google.com/mail/?p=BadCredentials d9443c01a7336-2ea7b36fb92sm947725ad.38 - gsmtp',
+  responseCode: 535,
+  command: 'AUTH PLAIN'
+}
+[0mPOST /api/auth/send-otp [31m500[0m 799.793 ms - 211[0m

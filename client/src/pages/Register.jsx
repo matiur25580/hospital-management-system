@@ -37,10 +37,9 @@ export default function Register() {
           {f.role || 'Select Account Role ▼'}
         </button>
         <div style={{position:'relative',marginTop:12}}>
-          <input type={show?'text':'password'} value={f.password} onChange={ch('password')} placeholder="Password" style={{...S.in,paddingRight:44}} required />
-          <button type="button" onClick={()=>setShow(!show)} style={S.eye}>{show?'🙈':'👁️'}</button>
+          <input type="password" value={f.password} onChange={ch('password')} placeholder="Password" style={{...S.in}} required />
         </div>
-        <input type={show?'text':'password'} value={f.confirm} onChange={ch('confirm')} placeholder="Confirm Password" style={S.in} required />
+        <input type="password" value={f.confirm} onChange={ch('confirm')} placeholder="Confirm Password" style={S.in} required />
         {err && <p style={S.err}>{err}</p>}
         <button disabled={busy} style={S.btn}>{busy?'Sending OTP…':'Send OTP & Continue'}</button>
         <p style={S.sm}>Have account? <Link to="/login">Login</Link></p>
