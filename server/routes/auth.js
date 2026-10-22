@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
+const Otp = require('../models/Otp');
 const r = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -23,6 +24,14 @@ r.post('/register',
       const { name, email, password, role } = req.body;
       if (await User.findOne({ email }))
         return res.status(409).json({ message: 'Email already registered' });
+      const { otp } = req.body;
+      const rec = await Otp.findOne({ email, password: 0, purpose: 'register' }).sort({ createdAt: -1 }).catch(()=>null);
+      const rec2 = rec || await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
+      console.log('OTP DEBUG:', JSON.stringify({ email, otp, found: !!rec2, dbOtp: rec2 && rec2.otp, dbPurpose: rec2 && rec2.purpose }));
+      const recF = rec2;
+      if (!recF || String(recF.otp).trim() !== String(otp || '').trim())
+        return res.status(400).json({ message: 'OTP verification failed' });
+      await Otp.deleteMany({ email, purpose: 'register' });
       const user = await User.create({ name, email, password, role });
       res.status(201).json({
         token: signToken(user),
