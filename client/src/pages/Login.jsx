@@ -1,43 +1,59 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const nav = useNavigate();
+  const [role, setRole] = useState('Employee');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const submit = async (e) => {
+    e.preventDefault(); setErr(''); setBusy(true);
     try {
-      await login(email, password);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Check credentials.');
-    } finally {
-      setLoading(false);
-    }
+      const res = await axios.post(API + '/auth/login', { email: identifier, password, role });
+      localStorage.setItem('hms_token', res.data.token);
+      localStorage.setItem('hms_user', JSON.stringify(res.data.user));
+      window.location.href = '/dashboard';
+    } catch (e2) {
+      setErr(e2.response?.data?.message || 'Login failed');
+    } finally { setBusy(false); }
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', padding: 16 }}>
-      <form onSubmit={handleSubmit} style={{ background: '#1e293b', padding: 32, borderRadius: 12, width: '100%', maxWidth: 380 }}>
-        <h2 style={{ color: '#fff', marginBottom: 8 }}>🏥 Hospital Login</h2>
-        <p style={{ color: '#94a3b8', marginBottom: 24, fontSize: 14 }}>Sign in to access the dashboard</p>
-        {error && <div style={{ background: '#7f1d1d', color: '#fecaca', padding: 10, borderRadius: 8, marginBottom: 16, fontSize: 14 }}>{error}</div>}
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required
-          style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }} />
-        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required
-          style={{ width: '100%', padding: 12, marginBottom: 20, borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }} />
-        <button type="submit" disabled={loading} style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
-          {loading ? 'Signing in...' : 'Login'}
-        </button>
+    <div style={S.wrap}>
+      <form onSubmit={submit} style={S.card}>
+        <h2 style={S.h}>🏥 Hospital Login</h2>
+        <label style={S.lb}>Account Role</label>
+        <select value={role} onChange={e=>setRole(e.target.value)} style={S.in}>
+          <option>Admin</option><option>HR</option><option>Employee</option>
+        </select>
+        <label style={S.lb}>Email or Unique ID</label>
+        <input value={identifier} onChange={e=>setIdentifier(e.target.value)} placeholder="Email or Unique ID" style={S.in} required />
+        <label style={S.lb}>Password</label>
+        <div style={{position:'relative'}}>
+          <input type={show?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" style={{...S.in,paddingRight:44}} required />
+          <button type="button" onClick={()=>setShow(!show)} style={S.eye}>{show?'🙈':'👁️'}</button>
+        </div>
+        {err && <p style={S.err}>{err}</p>}
+        <button disabled={busy} style={S.btn}>{busy?'Please wait…':'Login'}</button>
+        <p style={S.sm}>New here? <Link to="/register">Register first</Link></p>
       </form>
     </div>
   );
 }
+const S = {
+  wrap:{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0f172a',padding:16},
+  card:{width:'100%',maxWidth:400,background:'#1e293b',borderRadius:12,padding:28,color:'#e2e8f0'},
+  h:{textAlign:'center',marginBottom:20},
+  lb:{fontSize:13,margin:'12px 0 6px',display:'block',color:'#94a3b8'},
+  in:{width:'100%',padding:'12px',borderRadius:8,border:'1px solid #334155',background:'#0f172a',color:'#fff',fontSize:15,boxSizing:'border-box'},
+  eye:{position:'absolute',right:8,top:8,background:'none',border:'none',fontSize:18,cursor:'pointer'},
+  err:{color:'#f87171',fontSize:13,marginTop:10},
+  btn:{width:'100%',marginTop:18,padding:12,borderRadius:8,border:'none',background:'#2563eb',color:'#fff',fontSize:16,cursor:'pointer'},
+  sm:{textAlign:'center',fontSize:13,marginTop:14,color:'#94a3b8'},
+};
