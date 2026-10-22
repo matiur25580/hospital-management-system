@@ -1,0 +1,7 @@
+.env
+client/.env
+server/.env
+**/.env
+backend.log
+server/backend.log
+node_modules/
