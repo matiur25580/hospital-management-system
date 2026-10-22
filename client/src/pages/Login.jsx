@@ -1,28 +1,43 @@
 import { useState } from 'react';
-import api from '../api';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-export default function Login(){
-  const [email,setEmail]=useState(''); const [password,setPassword]=useState('');
-  const [err,setErr]=useState(''); const nav=useNavigate();
-  const submit=async(e)=>{
-    e.preventDefault(); setErr('');
-    try{
-      const {data}=await api.post('/auth/login',{email,password});
-      sessionStorage.setItem('token',data.token);
-      sessionStorage.setItem('user',JSON.stringify(data.user));
-      nav('/dashboard');
-    }catch(e){ setErr(e.response?.data?.message||'Login failed'); }
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Check credentials.');
+    } finally {
+      setLoading(false);
+    }
   };
+
   return (
-  <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0f172a',color:'#fff'}}>
-    <form onSubmit={submit} style={{background:'#1e293b',padding:32,borderRadius:12,width:'100%',maxWidth:380}}>
-      <h2 style={{marginBottom:8}}>🏥 Hospital Management</h2>
-      <p style={{color:'#94a3b8',marginBottom:20}}>Enterprise Patient Care System</p>
-      {err && <div style={{background:'#7f1d1d',padding:8,borderRadius:6,marginBottom:12}}>{err}</div>}
-      <input placeholder="Email" value={email} onChange={e=>setEmail(e.target.value)} style={{width:'100%',padding:10,marginBottom:10,borderRadius:6,border:'none'}}/>
-      <input placeholder="Password" type="password" value={password} onChange={e=>setPassword(e.target.value)} style={{width:'100%',padding:10,marginBottom:14,borderRadius:6,border:'none'}}/>
-      <button style={{width:'100%',padding:10,borderRadius:6,border:'none',background:'#2563eb',color:'#fff',fontWeight:'bold'}}>Login</button>
-    </form>
-  </div>);
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a', padding: 16 }}>
+      <form onSubmit={handleSubmit} style={{ background: '#1e293b', padding: 32, borderRadius: 12, width: '100%', maxWidth: 380 }}>
+        <h2 style={{ color: '#fff', marginBottom: 8 }}>🏥 Hospital Login</h2>
+        <p style={{ color: '#94a3b8', marginBottom: 24, fontSize: 14 }}>Sign in to access the dashboard</p>
+        {error && <div style={{ background: '#7f1d1d', color: '#fecaca', padding: 10, borderRadius: 8, marginBottom: 16, fontSize: 14 }}>{error}</div>}
+        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required
+          style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }} />
+        <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required
+          style={{ width: '100%', padding: 12, marginBottom: 20, borderRadius: 8, border: '1px solid #334155', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }} />
+        <button type="submit" disabled={loading} style={{ width: '100%', padding: 12, borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Signing in...' : 'Login'}
+        </button>
+      </form>
+    </div>
+  );
 }
