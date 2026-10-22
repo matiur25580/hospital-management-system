@@ -42,7 +42,10 @@ export default function Login() {
         {err && <p style={S.err}>{err}</p>}
         <button disabled={busy} style={S.btn}>{busy?'Please wait…':'Login'}</button>
         <p style={S.sm}>New here? <Link to="/register">Register first</Link></p>
-      </form>
+            <div style={{ textAlign: 'right', marginTop: 8 }}>
+        <Link to="/forgot-password" style={{ color: '#4f8cff', fontSize: 13, textDecoration: 'none' }}>Forgot Password?</Link>
+      </div>
+    </form>
     </div>
   );
 }
