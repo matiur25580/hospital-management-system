@@ -30,7 +30,7 @@ export default function Login() {
         <h2 style={S.h}>🏥 Hospital Login</h2>
         <label style={S.lb}>Account Role</label>
         <select value={role} onChange={e=>setRole(e.target.value)} style={S.in}>
-          <option>Admin</option><option>HR</option><option>Employee</option>
+          <option>Admin</option><option>Doctor</option><option>Nurse</option><option>Receptionist</option><option>Patient</option>
         </select>
         <label style={S.lb}>Email or Unique ID</label>
         <input value={identifier} onChange={e=>setIdentifier(e.target.value)} placeholder="Email or Unique ID" style={S.in} required />
@@ -52,7 +52,7 @@ const S = {
   h:{textAlign:'center',marginBottom:20},
   lb:{fontSize:13,margin:'12px 0 6px',display:'block',color:'#94a3b8'},
   in:{width:'100%',padding:'12px',borderRadius:8,border:'1px solid #334155',background:'#0f172a',color:'#fff',fontSize:15,boxSizing:'border-box'},
-  eye:{position:'absolute',right:8,top:8,background:'none',border:'none',fontSize:18,cursor:'pointer'},
+  eye:{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#fff',padding:'4px'},
   err:{color:'#f87171',fontSize:13,marginTop:10},
   btn:{width:'100%',marginTop:18,padding:12,borderRadius:8,border:'none',background:'#2563eb',color:'#fff',fontSize:16,cursor:'pointer'},
   sm:{textAlign:'center',fontSize:13,marginTop:14,color:'#94a3b8'},

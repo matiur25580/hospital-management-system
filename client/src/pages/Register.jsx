@@ -49,7 +49,7 @@ export default function Register() {
         <div style={S.modal} onClick={()=>setShowRole(false)}>
           <div style={S.pop} onClick={e=>e.stopPropagation()}>
             <h3 style={{marginTop:0}}>Select Role</h3>
-            {['Admin','HR','Employee'].map(r=>(
+            {['Admin','Doctor','Nurse','Receptionist','Patient'].map(r=>(
               <button key={r} type="button" style={S.ropt}
                 onClick={()=>{setF({...f,role:r});setShowRole(false);}}>{r}</button>
             ))}

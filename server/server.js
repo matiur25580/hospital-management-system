@@ -20,6 +20,7 @@ app.use(express.json());
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, max: 50, standardHeaders: true }));
 
 app.get('/api/health', (req,res)=> res.json({status:'Hospital API running'}));
+app.use('/api/auth', require('./routes/otpAuth'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/patients', require('./routes/patients'));
