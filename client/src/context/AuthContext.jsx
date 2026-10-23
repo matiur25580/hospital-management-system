@@ -21,6 +21,13 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
+  const saveAuth = (tok, usr) => {
+    sessionStorage.setItem('hms_token', tok);
+    sessionStorage.setItem('hms_user', JSON.stringify(usr));
+    setToken(tok);
+    setUser(usr);
+  };
+
   const logout = () => {
     sessionStorage.removeItem('hms_token');
     sessionStorage.removeItem('hms_user');
@@ -29,7 +36,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuth: !!token }}>
+    <AuthContext.Provider value={{ user, token, login, logout, saveAuth, isAuth: !!token }}>
       {children}
     </AuthContext.Provider>
   );

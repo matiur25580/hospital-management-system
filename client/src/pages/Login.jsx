@@ -4,12 +4,14 @@ import axios from 'axios';
 import AuthHeader from '../components/AuthHeader';
 import { useLang } from '../i18n/LanguageContext';
 import { useToast } from '../components/Toast';
+import { useAuth } from '../context/AuthContext';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Login() {
   const nav = useNavigate();
   const { t } = useLang();
   const toast = useToast();
+  const { saveAuth } = useAuth();
   const [role, setRole] = useState('Admin');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -27,8 +29,7 @@ export default function Login() {
     setBusy(true);
     try {
       const res = await axios.post(API + '/api/auth/login', { email: identifier.trim(), password, role });
-      sessionStorage.setItem('hms_token', res.data.token);
-      sessionStorage.setItem('hms_user', JSON.stringify(res.data.user));
+      saveAuth(res.data.token, res.data.user);
       const m = t('auth.login_success');
       setOk('✅ ' + m); toast.success(m);
       setTimeout(() => { nav('/dashboard', { replace: true }); }, 1200);
