@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DashTopBar from '../../components/DashTopBar';
 import api from '../../api';
 import CaseCard from '../../components/CaseCard';
 import Analytics from '../../components/Analytics';
@@ -68,6 +69,7 @@ export default function AdminDashboard({ name }) {
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-4">
+      <DashTopBar />
       <AdminOverview />
       <h2 className="text-xl font-bold">Welcome, {name} (Admin)</h2>
 

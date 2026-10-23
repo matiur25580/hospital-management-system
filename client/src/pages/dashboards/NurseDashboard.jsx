@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DashTopBar from '../../components/DashTopBar';
 import api from '../../api';
 import CaseCard from '../../components/CaseCard';
 import AttendanceMgmt from '../../components/AttendanceMgmt';
@@ -52,6 +53,7 @@ export default function NurseDashboard({ name }) {
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-4">
+      <DashTopBar />
       <h2 className="text-xl font-bold">Welcome, {name} (Nurse)</h2>
 
       <div className="grid grid-cols-3 gap-3">

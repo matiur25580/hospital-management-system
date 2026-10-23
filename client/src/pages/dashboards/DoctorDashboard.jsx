@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import DashTopBar from '../../components/DashTopBar';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import CaseCard from '../../components/CaseCard';
@@ -106,6 +107,7 @@ export default function DoctorDashboard({ name, initialTab = 'overview', pageMod
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-4">
+      <DashTopBar />
       {!pageMode && <h2 className="text-xl font-bold">Welcome, Dr. {name}</h2>}
 
       {pageMode ? (

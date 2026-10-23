@@ -128,3 +128,29 @@ code {
 .light .text-gray-300 { color: #334155 !important; }
 .light .border-gray-700, .light .border-gray-600 { border-color: #e2e8f0 !important; }
 .light input::placeholder, .light textarea::placeholder { color: #94a3b8; }
+
+/* HMS theme variables */
+:root, [data-theme="light"] {
+  --hms-bg: #f8fafc;
+  --hms-surface: #ffffff;
+  --hms-text: #1e293b;
+  --hms-text-muted: #64748b;
+  --hms-border: #e2e8f0;
+  --hms-accent: #2563eb;
+  --hms-accent-hover: #1d4ed8;
+  --hms-success: #16a34a;
+  --hms-warning: #f59e0b;
+  --hms-danger: #dc2626;
+}
+[data-theme="dark"] {
+  --hms-bg: #0f172a;
+  --hms-surface: #1e293b;
+  --hms-text: #f1f5f9;
+  --hms-text-muted: #94a3b8;
+  --hms-border: #334155;
+  --hms-accent: #3b82f6;
+  --hms-accent-hover: #60a5fa;
+  --hms-success: #22c55e;
+  --hms-warning: #fbbf24;
+  --hms-danger: #ef4444;
+}
