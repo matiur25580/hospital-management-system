@@ -32,16 +32,16 @@ export default function Beds(){
 
   return (
     <div style={{padding:16,maxWidth:900,margin:'0 auto'}}>
-      <h2 style={{color:'#1e293b'}}>Bed Management</h2>
+      <h2 style={{color:'var(--hms-text)'}}>Bed Management</h2>
       <form onSubmit={add} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:20,background:'#fff',padding:16,borderRadius:12}}>
         <input placeholder="Bed No" value={form.bedNo} onChange={e=>setForm({...form,bedNo:e.target.value})} required style={inp}/>
         <select value={form.ward} onChange={e=>setForm({...form,ward:e.target.value})} required style={inp}><option value="">Select Ward</option><option value="General">General</option><option value="ICU">ICU</option><option value="Emergency">Emergency</option><option value="Cabin">Cabin</option></select>
-        <button type="submit" style={{gridColumn:'1/-1',padding:10,background:'#2563eb',color:'#fff',border:'none',borderRadius:8,fontWeight:600}}>Add Bed</button>
+        <button type="submit" style={{gridColumn:'1/-1',padding:10,background:'#2563eb',color:'var(--hms-text)',border:'none',borderRadius:8,fontWeight:600}}>Add Bed</button>
       </form>
       {beds.map(b=>(
         <div key={b._id} style={{background:'#fff',padding:12,borderRadius:10,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
-            <b style={{color:'#1e293b'}}>{b.bedNo} — {b.ward} </b>
+            <b style={{color:'var(--hms-text)'}}>{b.bedNo} — {b.ward} </b>
             <div style={{fontSize:13,color:b.status==='available'?'#16a34a':'#ef4444',fontWeight:600}}>
               {b.status==='available' ? 'Available' : 'Occupied by '+b.patient?.name}
             </div>
@@ -63,4 +63,4 @@ export default function Beds(){
   );
 }
 const inp={padding:8,border:'1px solid #cbd5e1',borderRadius:8,fontSize:14};
-const btn=c=>({background:c,color:'#fff',border:'none',borderRadius:6,padding:'8px 14px',fontSize:13});
+const btn=c=>({background:c,color:'var(--hms-text)',border:'none',borderRadius:6,padding:'8px 14px',fontSize:13});

@@ -5,6 +5,9 @@ import Register from './pages/Register';
 import VerifyOtp from './pages/VerifyOtp';
 import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard';
+import Departments from './pages/Departments';
+import DoctorTabPage from './pages/doctor/DoctorTabPage';
+import ThemeToggle from './components/ThemeToggle';
 
 function Protected({ children }) {
   const { isAuth } = useAuth();
@@ -21,8 +24,11 @@ export default function App() {
         <Route path="/verify-otp" element={<VerifyOtp />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
+          <Route path="/departments" element={<Protected><Departments /></Protected>} />
+          <Route path="/doctor/:tab" element={<Protected><DoctorTabPage /></Protected>} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+      <ThemeToggle />
       </BrowserRouter>
     </AuthProvider>
   );

@@ -5,28 +5,30 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function Login() {
   const nav = useNavigate();
-  const [role, setRole] = useState('Employee');
+  const [role, setRole] = useState('Admin');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false); const [ok,setOk] = useState('');
 
   const submit = async (e) => {
-    e.preventDefault(); setErr(''); setBusy(true);
+    e.preventDefault(); setErr(''); setOk(''); setBusy(true);
     try {
-      const res = await axios.post(API + '/auth/login', { email: identifier, password, role });
-      localStorage.setItem('hms_token', res.data.token);
-      localStorage.setItem('hms_user', JSON.stringify(res.data.user));
-      window.location.href = '/dashboard';
+      const res = await axios.post(API + '/api/auth/login', { email: identifier, password, role });
+      sessionStorage.setItem('hms_token', res.data.token);
+      sessionStorage.setItem('hms_user', JSON.stringify(res.data.user));
+      setOk('Login successful! Redirecting to dashboard...');
+      setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
     } catch (e2) {
       setErr(e2.response?.data?.message || 'Login failed');
-    } finally { setBusy(false); }
+      setBusy(false);
+    }
   };
 
   return (
     <div style={S.wrap}>
-      <form onSubmit={submit} style={S.card}>
+      <form onSubmit={(e)=>e.preventDefault()} style={S.card}>
         <h2 style={S.h}>🏥 Hospital Login</h2>
         <label style={S.lb}>Account Role</label>
         <select value={role} onChange={e=>setRole(e.target.value)} style={S.in}>
@@ -40,7 +42,8 @@ export default function Login() {
           <button type="button" onClick={()=>setShow(!show)} style={S.eye}>{show?'🙈':'👁️'}</button>
         </div>
         {err && <p style={S.err}>{err}</p>}
-        <button disabled={busy} style={S.btn}>{busy?'Please wait…':'Login'}</button>
+        {ok && <p style={S.ok}>{'✅ ' + ok}</p>}
+        <button type="button" disabled={busy} onClick={submit} style={S.btn}>{busy?'Please wait…':'Login'}</button>
         <p style={S.sm}>New here? <Link to="/register">Register first</Link></p>
             <div style={{ textAlign: 'right', marginTop: 8 }}>
         <Link to="/forgot-password" style={{ color: '#4f8cff', fontSize: 13, textDecoration: 'none' }}>Forgot Password?</Link>
@@ -50,13 +53,14 @@ export default function Login() {
   );
 }
 const S = {
-  wrap:{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0f172a',padding:16},
-  card:{width:'100%',maxWidth:400,background:'#1e293b',borderRadius:12,padding:28,color:'#e2e8f0'},
+  wrap:{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'var(--hms-bg)',padding:16},
+  card:{width:'100%',maxWidth:400,background:'var(--hms-surface)',borderRadius:12,padding:28,color:'var(--hms-text)'},
   h:{textAlign:'center',marginBottom:20},
   lb:{fontSize:13,margin:'12px 0 6px',display:'block',color:'#94a3b8'},
-  in:{width:'100%',padding:'12px',borderRadius:8,border:'1px solid #334155',background:'#0f172a',color:'#fff',fontSize:15,boxSizing:'border-box'},
-  eye:{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',fontSize:20,cursor:'pointer',color:'#fff',padding:'4px'},
+  in:{width:'100%',padding:'12px',borderRadius:8,border:'1px solid var(--hms-border)',background:'var(--hms-bg)',color:'var(--hms-text)',fontSize:15,boxSizing:'border-box'},
+  eye:{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',fontSize:20,cursor:'pointer',color:'var(--hms-text)',padding:'4px'},
   err:{color:'#f87171',fontSize:13,marginTop:10},
-  btn:{width:'100%',marginTop:18,padding:12,borderRadius:8,border:'none',background:'#2563eb',color:'#fff',fontSize:16,cursor:'pointer'},
+  ok:{color:'#4ade80',fontSize:13,marginTop:10},
+  btn:{width:'100%',marginTop:18,padding:12,borderRadius:8,border:'none',background:'#2563eb',color:'var(--hms-text)',fontSize:16,cursor:'pointer'},
   sm:{textAlign:'center',fontSize:13,marginTop:14,color:'#94a3b8'},
 };

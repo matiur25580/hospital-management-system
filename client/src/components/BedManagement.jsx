@@ -6,19 +6,21 @@ export default function BedManagement({ mode, userName }) {
   const { t } = useLang();
   const [beds, setBeds] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ ward: 'General', bedNo: '', type: 'general' });
+  const [wards, setWards] = useState([]);
+  const [form, setForm] = useState({ ward: '', bedNo: '', type: 'general' });
   const [assignId, setAssignId] = useState(null);
   const [pEmail, setPEmail] = useState('');
 
   const load = async () => {
-    try { const { data } = await api.get('/beds'); setBeds(data); }
+    try { const { data } = await api.get('/beds'); setBeds(data);
+    try { const { data: w } = await api.get('/beds/wards'); setWards(w); setForm(f => ({ ...f, ward: f.ward || (w[0]?._id || '') })); } catch (e) { console.error(e); } }
     catch (e) { console.error(e); }
   };
   useEffect(() => { load(); }, []);
 
   const addBed = async () => {
     if (!form.bedNo.trim()) { alert(t('bed.bed_no')); return; }
-    try { await api.post('/beds', form); setForm({ ward: 'General', bedNo: '', type: 'general' }); setShowAdd(false); load(); }
+    try { await api.post('/beds', { ward: form.ward, bedNumber: form.bedNo.trim(), type: form.type }); setForm(f => ({ ward: f.ward, bedNo: '', type: 'general' })); setShowAdd(false); load(); }
     catch (e) { alert('Failed: ' + (e.response?.data?.message || e.message)); }
   };
 
@@ -49,7 +51,7 @@ export default function BedManagement({ mode, userName }) {
         <div className="bg-gray-800 p-3 rounded-xl space-y-2">
           <div className="flex gap-2">
             <select className="flex-1 bg-gray-700 p-2 rounded text-sm" value={form.ward} onChange={e => setForm({ ...form, ward: e.target.value })}>
-              <option>General</option><option>ICU</option><option>Emergency</option><option>Maternity</option><option>Pediatric</option>
+              {wards.map(w => <option key={w._id} value={w._id}>{w.name}</option>)}
             </select>
             <input className="flex-1 bg-gray-700 p-2 rounded text-sm" placeholder={t('bed.bed_no')} value={form.bedNo} onChange={e => setForm({ ...form, bedNo: e.target.value })} />
           </div>

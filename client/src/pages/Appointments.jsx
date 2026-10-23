@@ -28,7 +28,7 @@ export default function Appointments(){
 
   return (
     <div style={{padding:16,maxWidth:900,margin:'0 auto'}}>
-      <h2 style={{color:'#1e293b'}}>Appointments</h2>
+      <h2 style={{color:'var(--hms-text)'}}>Appointments</h2>
       <form onSubmit={book} style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:20,background:'#fff',padding:16,borderRadius:12}}>
         <select value={form.patient} onChange={e=>setForm({...form,patient:e.target.value})} required style={inp}>
           <option value="">Select Patient</option>
@@ -40,12 +40,12 @@ export default function Appointments(){
         </select>
         <input type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})} required style={inp}/>
         <input placeholder="Reason" value={form.reason} onChange={e=>setForm({...form,reason:e.target.value})} style={inp}/>
-        <button type="submit" style={{gridColumn:'1/-1',padding:10,background:'#2563eb',color:'#fff',border:'none',borderRadius:8,fontWeight:600}}>Book Appointment</button>
+        <button type="submit" style={{gridColumn:'1/-1',padding:10,background:'#2563eb',color:'var(--hms-text)',border:'none',borderRadius:8,fontWeight:600}}>Book Appointment</button>
       </form>
       {list.map(a=>(
         <div key={a._id} style={{background:'#fff',padding:12,borderRadius:10,marginBottom:8,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
-            <b style={{color:'#1e293b'}}>Token #{a.tokenNo} — {a.patient?.name}</b>
+            <b style={{color:'var(--hms-text)'}}>Token #{a.tokenNo} — {a.patient?.name}</b>
             <div style={{fontSize:13,color:'#64748b'}}>{a.doctor?.name?.startsWith('Dr.')?a.doctor.name:'Dr. '+a.doctor?.name} | {a.date?.slice(0,10)} | {a.status}</div>
           </div>
           <div style={{display:'flex',gap:6}}>
@@ -58,4 +58,4 @@ export default function Appointments(){
   );
 }
 const inp={padding:10,border:'1px solid #cbd5e1',borderRadius:8,fontSize:14};
-const btn=c=>({background:c,color:'#fff',border:'none',borderRadius:6,padding:'6px 12px',fontSize:13});
+const btn=c=>({background:c,color:'var(--hms-text)',border:'none',borderRadius:6,padding:'6px 12px',fontSize:13});

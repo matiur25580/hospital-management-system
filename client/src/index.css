@@ -1,3 +1,4 @@
+@import "tailwindcss";
 :root {
   --text: #6b6375;
   --text-h: #08060d;
@@ -109,3 +110,21 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* ===== Light theme overrides (.light on <html>) ===== */
+:root { color-scheme: dark; }
+.light { color-scheme: light; }
+.light body { background-color: #f1f5f9; }
+.light .bg-gray-900 { background-color: #f1f5f9 !important; }
+.light .bg-gray-800 { background-color: #ffffff !important; box-shadow: 0 1px 3px rgb(0 0 0 / 0.08); }
+.light .bg-gray-700 { background-color: #e9eef5 !important; }
+.light .bg-gray-600 { background-color: #dde5ef !important; }
+.light .hover\:bg-gray-700:hover { background-color: #e9eef5 !important; }
+.light .bg-gray-900, .light .bg-gray-800, .light .bg-gray-700 { color: #0f172a; }
+.light .bg-gray-900.text-white, .light .bg-gray-800.text-white, .light .bg-gray-700.text-white,
+.light .bg-gray-900 .text-white, .light .bg-gray-800 .text-white, .light .bg-gray-700 .text-white { color: #0f172a !important; }
+.light .text-gray-500 { color: #64748b !important; }
+.light .text-gray-400 { color: #475569 !important; }
+.light .text-gray-300 { color: #334155 !important; }
+.light .border-gray-700, .light .border-gray-600 { border-color: #e2e8f0 !important; }
+.light input::placeholder, .light textarea::placeholder { color: #94a3b8; }
