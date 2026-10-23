@@ -32,9 +32,9 @@ export default function App() {
               <Route path="/dashboard" element={<Protected><Dashboard /></Protected>} />
               <Route path="/departments" element={<Protected><Departments /></Protected>} />
               <Route path="/doctor/:tab" element={<Protected><DoctorTabPage /></Protected>} />
-              <Route path="/lab-reports" element={<Protected><LabReports />} />
-              <Route path="/pharmacy" element={<Protected><Pharmacy />} />
-              <Route path="/ambulance" element={<Protected><Ambulance />} />
+              <Route path="/lab-reports" element={<Protected><LabReports /></Protected>} />
+              <Route path="/pharmacy" element={<Protected><Pharmacy /></Protected>} />
+              <Route path="/ambulance" element={<Protected><Ambulance /></Protected>} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </BrowserRouter>
