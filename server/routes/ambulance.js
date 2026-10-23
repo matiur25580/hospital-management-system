@@ -3,78 +3,80 @@ const { protect } = require('../middleware/auth');
 const Ambulance = require('../models/Ambulance');
 const AmbulanceTrip = require('../models/AmbulanceTrip');
 
-// POST /api/ambulance/seed
-r.post('/seed', protect, async (req, res) => {
+// GET /api/ambulance (?status=available)
+r.get('/', protect, async (req, res) => {
   try {
-    if (await Ambulance.countDocuments() > 0) return res.json({ seeded: 0 });
-    const V = [
-      { vehicleNo: 'WB 11 C 4521', driverName: 'Ramesh Yadav', driverPhone: '9830011223', type: 'advanced', status: 'available', baseLocation: 'Hospital Gate' },
-      { vehicleNo: 'WB 11 C 7834', driverName: 'Sanjay Das', driverPhone: '9830044556', type: 'basic', status: 'available', baseLocation: 'Hospital Gate' },
-      { vehicleNo: 'WB 12 D 2210', driverName: 'Prakash Singh', driverPhone: '9830077889', type: 'basic', status: 'maintenance', baseLocation: 'Garage' },
-      { vehicleNo: 'WB 11 E 9090', driverName: 'Anil Kumar', driverPhone: '9830011998', type: 'advanced', status: 'available', baseLocation: 'Raiganj Stand' }
-    ];
-    await Ambulance.insertMany(V);
-    res.json({ seeded: V.length });
+    const q = req.query.status ? { status: req.query.status } : {};
+    res.json(await Ambulance.find(q).sort({ vehicleNo: 1 }));
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-r.get('/vehicles', protect, async (req, res) => {
-  try { res.json(await Ambulance.find().sort({ vehicleNo: 1 })); }
-  catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-r.post('/vehicles', protect, async (req, res) => {
+// POST /api/ambulance -> add ambulance
+r.post('/', protect, async (req, res) => {
   try { res.status(201).json(await Ambulance.create(req.body)); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-r.patch('/vehicles/:id', protect, async (req, res) => {
+// PATCH /api/ambulance/:id -> update (status/location/driver)
+r.patch('/:id', protect, async (req, res) => {
   try { res.json(await Ambulance.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// GET /api/ambulance/trips (?active=1)
+// DELETE /api/ambulance/:id
+r.delete('/:id', protect, async (req, res) => {
+  try { await Ambulance.findByIdAndDelete(req.params.id); res.json({ message: 'deleted' }); }
+  catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// POST /api/ambulance/dispatch -> dispatch available ambulance
+r.post('/dispatch', protect, async (req, res) => {
+  try {
+    const amb = await Ambulance.findById(req.body.ambulanceId);
+    if (!amb) return res.status(404).json({ message: 'Ambulance not found' });
+    if (amb.status !== 'available') return res.status(400).json({ message: 'Ambulance not available (status: ' + amb.status + ')' });
+    amb.status = 'on-trip';
+    await amb.save();
+    const trip = await AmbulanceTrip.create({
+      ambulanceId: amb._id, vehicleNo: amb.vehicleNo,
+      driverName: amb.driverName, driverPhone: amb.driverPhone,
+      patientName: req.body.patientName, patientPhone: req.body.patientPhone,
+      pickupLocation: req.body.pickupLocation, destination: req.body.destination || 'Hospital',
+      currentLocation: amb.baseLocation, status: 'dispatched',
+      stages: { dispatched: new Date() }, notes: req.body.notes,
+      dispatchedBy: req.user.email || req.user.name
+    });
+    res.status(201).json(trip);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// GET /api/ambulance/trips (?status= / ?active=true)
 r.get('/trips', protect, async (req, res) => {
   try {
-    const q = req.query.active ? { status: { $nin: ['completed', 'cancelled'] } } : {};
+    const q = {};
+    if (req.query.status) q.status = req.query.status;
+    if (req.query.active === 'true') q.status = { $nin: ['completed', 'cancelled'] };
     res.json(await AmbulanceTrip.find(q).sort({ dispatchedAt: -1 }).limit(100));
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// POST /api/ambulance/trips - dispatch
-r.post('/trips', protect, async (req, res) => {
-  try {
-    const v = await Ambulance.findById(req.body.ambulanceId);
-    if (!v || v.status !== 'available') return res.status(400).json({ message: 'Ambulance not available' });
-    const trip = await AmbulanceTrip.create({
-      ...req.body, vehicleNo: v.vehicleNo, driverName: v.driverName, driverPhone: v.driverPhone,
-      status: 'dispatched', stages: { dispatched: new Date() }
-    });
-    v.status = 'on-trip'; await v.save();
-    res.status(201).json(trip);
-  } catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-const STAGE_KEY = { 'en-route': 'enRoute', 'on-scene': 'onScene', 'to-hospital': 'toHospital', 'completed': 'completed' };
-
-// PATCH /api/ambulance/trips/:id - update status/location
+// PATCH /api/ambulance/trips/:id -> update stage/location
+// body: { status: 'en-route'|'on-scene'|'to-hospital'|'completed'|'cancelled', currentLocation }
 r.patch('/trips/:id', protect, async (req, res) => {
   try {
     const trip = await AmbulanceTrip.findById(req.params.id);
-    if (!trip) return res.status(404).json({ message: 'Not found' });
-    if (req.body.status && req.body.status !== trip.status) {
-      trip.status = req.body.status;
-      const key = STAGE_KEY[req.body.status];
-      if (key) trip.stages[key] = new Date();
-      if (['completed', 'cancelled'].includes(req.body.status)) {
-        await Ambulance.findByIdAndUpdate(trip.ambulanceId, { status: 'available', baseLocation: trip.currentLocation || undefined });
-      }
-    }
-    if (req.body.currentLocation !== undefined) trip.currentLocation = req.body.currentLocation;
-    if (req.body.notes !== undefined) trip.notes = req.body.notes;
+    if (!trip) return res.status(404).json({ message: 'Trip not found' });
+    const stageKey = { 'en-route': 'enRoute', 'on-scene': 'onScene', 'to-hospital': 'toHospital', 'completed': 'completed' }[req.body.status];
+    if (req.body.status) trip.status = req.body.status;
+    if (stageKey) trip.stages[stageKey] = new Date();
+    if (req.body.currentLocation) trip.currentLocation = req.body.currentLocation;
+    if (req.body.notes) trip.notes = req.body.notes;
     await trip.save();
+    if (['completed', 'cancelled'].includes(trip.status)) {
+      await Ambulance.findByIdAndUpdate(trip.ambulanceId, { status: 'available', baseLocation: trip.destination });
+    }
     res.json(trip);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 module.exports = r;

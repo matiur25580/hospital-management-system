@@ -41,3 +41,41 @@ r.patch('/:id', protect, async (req, res) => {
 });
 
 module.exports = r;
+
+// DELETE /api/lab-reports/:id
+r.delete('/:id', protect, async (req, res) => {
+  try { await LabReport.findByIdAndDelete(req.params.id); res.json({ message: 'deleted' }); }
+  catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// GET /api/lab-reports/stats/summary -> counts by status
+r.get('/stats/summary', protect, async (req, res) => {
+  try {
+    const [pending, reviewed, retest, critical] = await Promise.all([
+      LabReport.countDocuments({ status: 'pending' }),
+      LabReport.countDocuments({ status: 'reviewed' }),
+      LabReport.countDocuments({ status: 'retest' }),
+      LabReport.countDocuments({ isCritical: true, status: 'pending' })
+    ]);
+    res.json({ pending, reviewed, retest, critical });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// DELETE /api/lab-reports/:id
+r.delete('/:id', protect, async (req, res) => {
+  try { await LabReport.findByIdAndDelete(req.params.id); res.json({ message: 'deleted' }); }
+  catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// GET /api/lab-reports/stats/summary -> counts by status
+r.get('/stats/summary', protect, async (req, res) => {
+  try {
+    const [pending, reviewed, retest, critical] = await Promise.all([
+      LabReport.countDocuments({ status: 'pending' }),
+      LabReport.countDocuments({ status: 'reviewed' }),
+      LabReport.countDocuments({ status: 'retest' }),
+      LabReport.countDocuments({ isCritical: true, status: 'pending' })
+    ]);
+    res.json({ pending, reviewed, retest, critical });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});

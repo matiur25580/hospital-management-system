@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import DashTopBar from '../../components/DashTopBar';
 import api from '../../api';
 import CaseCard from '../../components/CaseCard';
@@ -105,6 +106,24 @@ export default function AdminDashboard({ name }) {
         <div className="bg-gray-800 p-4 rounded-xl border-l-4 border-pink-500">
           <div className="text-2xl font-bold">{stats.pendingLabs}</div>
           <div className="text-gray-400 text-sm">Pending Labs</div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-bold mb-2">Quick Links</h3>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <Link to="/lab-reports" className="bg-gray-800 p-3 rounded-xl text-center border-l-4 border-cyan-500 hover:bg-gray-700">
+            <div className="text-xl">🧪</div>
+            <div className="text-sm font-semibold">Lab Reports</div>
+          </Link>
+          <Link to="/pharmacy" className="bg-gray-800 p-3 rounded-xl text-center border-l-4 border-green-500 hover:bg-gray-700">
+            <div className="text-xl">💊</div>
+            <div className="text-sm font-semibold">Pharmacy</div>
+          </Link>
+          <Link to="/ambulance" className="bg-gray-800 p-3 rounded-xl text-center border-l-4 border-red-500 hover:bg-gray-700">
+            <div className="text-xl">🚑</div>
+            <div className="text-sm font-semibold">Ambulance</div>
+          </Link>
         </div>
       </div>
 
