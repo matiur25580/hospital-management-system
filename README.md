@@ -131,5 +131,8 @@ Skin, Blood, Ear, Hair, Eye, Kidney, Liver, Nerve, Maternity, Anesthesia, Pediat
 
 ## Author
 
-Rubel Ali — MERN Full-Stack Developer, Newtown Kolkata, West Bengal, India
-Email: rahamannatur397@gmail.com
+**Matiur Rahaman** — MERN Full-Stack Developer, Raiganj, West Bengal, India  
+GitHub: https://github.com/matiur25580  
+Email: rahamanmatiur397@gmail.com
+
+Built as a solo Full Stack project to learn enterprise-style HMS - role-based dashboards, OTP auth, and 30+ modules.
