@@ -10,7 +10,7 @@ jest.setTimeout(60000);
 beforeAll(async () => {
   proc = spawn('node', ['server.js'], {
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, PORT: String(PORT) },
+    env: { ...process.env, PORT: String(PORT), JWT_SECRET: process.env.JWT_SECRET || 'ci-test-jwt-secret-with-sufficient-entropy' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   proc.stdout.on('data', chunk => { startupOutput += chunk.toString(); });
