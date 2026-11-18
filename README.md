@@ -1,138 +1,135 @@
-# 🏥 CityCare Hospital — Enterprise Hospital Management & Patient Care System
+# CityCare Hospital Management System
 
-> A full-stack, enterprise-grade Hospital Management System (HMS) with role-based dashboards, real OTP authentication, and 30+ operational modules.
+A full-stack hospital-operations portfolio application demonstrating patient administration, appointment workflows, clinical-support modules, billing, inventory and staff operations.
 
-## 📌 Overview
+> **Important:** This is a software portfolio/demo project, not a certified clinical system or a production hospital information system. Do not enter real patient records, protected health information or live clinical data.
 
-CityCare Hospital is a **production-ready, enterprise-grade** hospital management platform built with the **MERN stack**: patient registration, doctor scheduling, ward/bed management, ambulance tracking, pharmacy, lab, billing, insurance, HR & payroll, and compliance — with **role-based access control** and **real email OTP authentication**.
+## Overview
 
-| Stack | Technology |
+CityCare brings multiple hospital workflows into role-oriented workspaces. The current feature set includes patient registration, doctor scheduling, appointments, ward and bed management, pharmacy, laboratory, billing, insurance, staff operations and administrative reporting.
+
+## Roles and workspaces
+
+| Role | Example workflows |
 |---|---|
-| **Frontend** | React 19 + Vite, CSS variables |
-| **Backend** | Node.js + Express |
-| **Database** | MongoDB + Mongoose (one Atlas cluster, separate DB per project) |
-| **Auth** | JWT + bcrypt + real Gmail SMTP OTP (6-digit, 5-min expiry) |
-| **i18n** | English + Hindi (auto-detect, localStorage) |
-| **Theming** | Dark / Light mode (persisted) |
-| **Deploy** | Vercel (frontend) + Render (backend) |
+| Admin | Staff administration, departments, payroll, recruitment and analytics |
+| Doctor | Appointments, OPD queue, prescriptions, lab review and discharge workflows |
+| Nurse | Ward/bed operations, vitals, medication notes and duty roster |
+| Receptionist | Patient registration, appointments, billing and insurance |
+| Patient | Appointment requests, prescriptions, lab reports and bills |
 
-## 🔐 Authentication & Security
+## Functional areas
 
-- **Real DB authentication** — no hardcoded demo logins
-- **Account Role dropdown** (Admin / Doctor / Nurse / Receptionist / Patient) above "Email or Unique ID" box
-- **Registration**: full name, email, contact number, DOB (DDMMYYYY), role popup, password + confirm
-- **Real email OTP** via Gmail App Password: 6-digit, MongoDB `otps` collection, 5-min validity, countdown timer, resend at 0s, never shown in UI
-- **Password reset** rejects same-as-current password
-- **Unique ID** format `RNSDDMMYYYY` shown after registration
-- `.env` never committed (`.gitignore` + `.env.example`)
+- **Patient care:** patient records, appointments, OPD queue, prescriptions, vitals, lab reports and discharge.
+- **Emergency operations:** ambulance dispatch and fleet information.
+- **Facilities:** wards, beds, OT scheduling and visitor passes.
+- **Finance and supply:** billing, insurance claims, pharmacy, inventory and purchase orders.
+- **Workforce:** staff hierarchy, payroll, attendance, roster, recruitment and appraisals.
+- **Administration:** notices, feedback, analytics and compliance-oriented workflows.
 
-## 👥 Roles & Dashboards
+Feature availability should be verified against the current application and configured services; a listed module is not a certification of clinical completeness.
 
-| Role | Capabilities |
+## Technology
+
+| Layer | Technology |
 |---|---|
-| **Admin** | Staff & hierarchy, payroll, job posting, hiring, notice board, analytics |
-| **Doctor** | OPD queue, appointments, e-prescriptions, teleconsult, OT, lab review, discharge |
-| **Nurse** | Ward/bed, vitals, duty roster, medication notes |
-| **Receptionist** | Patient registration, appointments, gate passes, billing, insurance claims |
-| **Patient** | Book appointments, prescriptions, lab reports, bills, feedback |
+| Frontend | React, Vite |
+| Backend | Node.js, Express 5 |
+| Database | MongoDB, Mongoose |
+| Authentication | JWT, bcryptjs, email OTP |
+| Security libraries | Helmet, express-rate-limit, express-validator |
+| Realtime | Socket.IO |
+| Documents | PDFKit, Cloudinary / Multer |
+| API documentation | Swagger UI |
 
-## 🧩 Modules (30+)
+## Repository structure
 
-### Clinical & Patient Care
-- Patient Management — registration, unique ID, admission/discharge
-- Doctor Directory — departments, OPD days, timings, room numbers
-- Appointments & OPD Queue — booking, token system, live queue
-- Telemedicine (Video OPD) — book consult (Rs.300), doctor confirm, e-prescription
-- Pharmacy / e-Prescription — prescribe, dispense, stock deduction
-- Lab Management — test catalog, orders, sample collection, results
-- OT Booking — surgeries with surgeon, anesthetist, nurses
-- Ward & Bed Management — availability, allocation, transfers
-- Discharge Summary — diagnosis, treatment, medicines, follow-up
-- Vitals & Nursing Notes
+```text
+client/
+  src/
+    components/
+    context/
+    i18n/
+    pages/
+server/
+  routes/
+  models/
+  seed/
+  server.js
+  swagger.js
+```
 
-### Emergency & Logistics
-- Ambulance Dispatch — intake, vehicle assignment, live tracking (15s refresh)
-- Ambulance Fleet — vehicle registry, driver details, availability
-- Visitor / Gate Pass — issue passes, check-in/check-out, print pass
+## Local setup
 
-### Billing, Insurance & Stock
-- Billing & Invoices — itemized bills, payment tracking
-- Insurance Claims — filing, pending to approved to settled, documents
-- Inventory & Expiry — batch no, expiry alerts, reorder levels
-- Purchase Orders — supplier POs, send/receive flow
+### Requirements
 
-### HR, Payroll & Compliance
-- Staff & Hierarchy — org chart, designations, reporting lines
-- Payroll — monthly salary, pay slips, paid/pending tracking
-- Attendance — check-in/out, monthly summary, leave approvals
-- Duty Roster — shift planning, auto-generate
-- Recruitment — job postings, applicant pipeline, one-click hire
-- Performance Appraisal — ratings, goals, draft/submit/acknowledge
-- ID Cards — generator with photo, blood group, print-ready
-- PPE Compliance — mask & gloves checks, zone-wise tracking
-- Cleaning Schedule — zone-wise tasks, weekly roster
+- Node.js and npm
+- MongoDB
+- Email account/app password for OTP flows
+- Cloudinary credentials if the configured upload flows are used
 
-### Engagement & Admin
-- Notice Board — by category & priority with validity dates
-- Patient Feedback — cleanliness, staff, doctor care, waiting time
-- Analytics — revenue, occupancy, OPD footfall, claims
+### 1. Configure the backend
 
-## Project Structure
+```bash
+cd server
+npm install
+```
 
-    hospital-management-system/
-    ├── client/src/
-    │   ├── components/   # AuthHeader, DashTopBar, ThemeSwitcher, Toast
-    │   ├── context/      # AuthContext, ThemeContext, LanguageContext
-    │   ├── i18n/         # translations.js (en + hi)
-    │   ├── pages/        # Login, Register, dashboards
-    │   └── App.jsx
-    ├── server/
-    │   ├── routes/       # otpAuth.js + 30+ route files
-    │   ├── models/       # User, Otp, Ward, Bed, Department
-    │   ├── seed/         # hospitalMaster.js (16 departments)
-    │   └── index.js      # port 5000
-    └── README.md
+Create `server/.env`:
 
-## Environment Variables (server/.env)
+```dotenv
+MONGO_URI=mongodb://127.0.0.1:27017/citycare_hospital
+JWT_SECRET=replace-with-a-long-random-secret
+EMAIL_USER=your_email@example.com
+EMAIL_PASS=your_email_app_password
+CLIENT_URL=http://localhost:5173
+PORT=5000
+```
 
-    MONGO_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/hospitalDB
-    JWT_SECRET=<long-random-secret>
-    EMAIL_USER=yourgmail@gmail.com
-    EMAIL_PASS=xxxxxxxxxxxxxxxx
-    CLIENT_URL=http://localhost:5173
-    PORT=5000
+Start the API:
 
-App trims EMAIL_USER and strips whitespace from EMAIL_PASS, with fallback so signup never blocks.
+```bash
+npm start
+```
 
-## Getting Started
+### 2. Start the frontend
 
-    cd server && npm install && node index.js   # http://localhost:5000
-    cd client && npm install && npm run dev     # http://localhost:5173
-    cd client && npm run build                  # production build -> dist
+In a second terminal:
 
-## Deployment
+```bash
+cd client
+npm install
+npm run dev
+```
 
-- Frontend: Vercel — Root: client, Build: npm run build, Output: dist
-- Backend: Render — Root: server, Start: npm start
-- Auto-deploy on push to main; Render CLIENT_URL must match Vercel URL (CORS)
+Use the frontend's configured API base URL to point to the local API.
 
-## Key Technical Decisions
+## Security, privacy and production limitations
 
-1. No demo logins — every login hits MongoDB
-2. Role-first login — Account Role dropdown above Email/Unique ID field
-3. OTP in DB, not memory — survives restarts; 5-min TTL server-side
-4. One Atlas cluster, many DBs — change DB name per project, free-tier friendly
-5. Mobile-first development — built entirely on Android (Termux + Codespaces)
-6. Lightweight i18n — context-based, English fallback
+The server includes security-related dependencies and middleware, but the current server configuration still needs a production security pass. In particular, review and restrict Express CORS and Socket.IO origins, verify authentication and role authorization on every sensitive route and realtime event, and harden upload handling and file access.
 
-## Departments Seeded (16)
+Before any real deployment, the project requires:
 
-Skin, Blood, Ear, Hair, Eye, Kidney, Liver, Nerve, Maternity, Anesthesia, Pediatrics + 5 more in server/seed/hospitalMaster.js
+- A documented threat model and independent security review.
+- Strong tenant/role isolation and authorization tests.
+- Private file storage with access-controlled downloads and retention rules.
+- Audit coverage for sensitive clinical and financial operations.
+- Encrypted transport, backups, monitoring and incident-response procedures.
+- Privacy, regulatory and clinical workflow review by qualified professionals.
 
-## Author
+Use synthetic demo data only. No claim of HIPAA, GDPR, Indian healthcare regulatory or clinical certification is made.
 
-**Matiur Rahaman** — MERN Full-Stack Developer, Raiganj, West Bengal, India  
-GitHub: https://github.com/matiur25580  
-Email: rahamanmatiur397@gmail.com
+## Tests and verification
 
-Built as a solo Full Stack project to learn enterprise-style HMS - role-based dashboards, OTP auth, and 30+ modules.
+The backend package provides a Jest test command:
+
+```bash
+cd server
+npm test
+```
+
+Run the frontend production build using the client package's build script. A successful build alone does not establish clinical safety or production readiness.
+
+## Maintainer
+
+**Matiur Rahaman** · [GitHub](https://github.com/matiur25580)
