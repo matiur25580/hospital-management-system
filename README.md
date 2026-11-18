@@ -106,7 +106,7 @@ Use the frontend's configured API base URL to point to the local API.
 
 ## Security, privacy and production limitations
 
-The server includes security-related dependencies and middleware, but the current server configuration still needs a production security pass. In particular, review and restrict Express CORS and Socket.IO origins, verify authentication and role authorization on every sensitive route and realtime event, and harden upload handling and file access.
+The active server now applies an explicit Express CORS allowlist and matching Socket.IO origin allowlist using the comma-separated `CLIENT_URL` setting, Helmet, a 1 MB JSON body limit, and authentication-route rate limiting. It also requires `MONGO_URI` instead of silently falling back to a local database. These are baseline controls, not a complete security boundary. Verify authentication and role authorization on every sensitive route and realtime event, and harden upload handling and file access before deployment.
 
 Before any real deployment, the project requires:
 
