@@ -133,3 +133,9 @@ Run the frontend production build using the client package's build script. A suc
 ## Maintainer
 
 **Matiur Rahaman** · [GitHub](https://github.com/matiur25580)
+
+## Live Demo
+
+**Frontend:** [Open Live Demo](https://hospital-management-system-drab-one.vercel.app)
+
+> This link points to the deployed frontend. Features that depend on the API, database, email, file storage, or other external services may require the corresponding backend services and environment variables to be configured. Use test data only; this demo is not a production service.
