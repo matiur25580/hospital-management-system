@@ -152,3 +152,80 @@ Run the frontend production build using the client package's build script. A suc
 **Frontend:** [Open Live Demo](https://hospital-management-system-drab-one.vercel.app)
 
 > This link points to the deployed frontend. Features that depend on the API, database, email, file storage, or other external services may require the corresponding backend services and environment variables to be configured. Use test data only; this demo is not a production service.
+
+
+## Dashboard Gallery
+
+Explore 12 illustrative CityCare workspaces for hospital operations, patient administration, appointments, staff, wards and beds, laboratory, pharmacy, billing and insurance, emergency care, OT scheduling, attendance and analytics. All visuals use synthetic sample values and are not live clinical screenshots or real patient/health records. This portfolio project is not a certified clinical system.
+
+### 01. Hospital Operations Overview
+
+Hospital capacity, patient flow, appointments and operational readiness.
+
+![Hospital Operations Overview dashboard preview](docs/readme-dashboard-gallery/dashboard-01.svg)
+
+### 02. Patient Administration
+
+Patient registrations, records, demographics and registration workflow.
+
+![Patient Administration dashboard preview](docs/readme-dashboard-gallery/dashboard-02.svg)
+
+### 03. Appointments & OPD Queue
+
+Appointment schedules, doctor availability, OPD waiting and visit status.
+
+![Appointments & OPD Queue dashboard preview](docs/readme-dashboard-gallery/dashboard-03.svg)
+
+### 04. Doctor & Staff Workspace
+
+Clinician schedules, staff availability, duty rosters and workload distribution.
+
+![Doctor & Staff Workspace dashboard preview](docs/readme-dashboard-gallery/dashboard-04.svg)
+
+### 05. Ward & Bed Management
+
+Ward capacity, bed allocation, occupancy and discharge readiness.
+
+![Ward & Bed Management dashboard preview](docs/readme-dashboard-gallery/dashboard-05.svg)
+
+### 06. Laboratory Operations
+
+Lab orders, sample collection, processing stages and report turnaround.
+
+![Laboratory Operations dashboard preview](docs/readme-dashboard-gallery/dashboard-06.svg)
+
+### 07. Pharmacy & Inventory
+
+Medicine stock, dispensing activity, low-stock alerts and replenishment.
+
+![Pharmacy & Inventory dashboard preview](docs/readme-dashboard-gallery/dashboard-07.svg)
+
+### 08. Billing & Insurance
+
+Patient billing, invoice status, insurance claims and outstanding balances.
+
+![Billing & Insurance dashboard preview](docs/readme-dashboard-gallery/dashboard-08.svg)
+
+### 09. Emergency & Ambulance
+
+Emergency arrivals, triage priority, ambulance dispatch and response status.
+
+![Emergency & Ambulance dashboard preview](docs/readme-dashboard-gallery/dashboard-09.svg)
+
+### 10. OT & Procedure Scheduling
+
+Operation theatre schedules, procedure slots, preparation and utilization.
+
+![OT & Procedure Scheduling dashboard preview](docs/readme-dashboard-gallery/dashboard-10.svg)
+
+### 11. Staff Attendance & Payroll
+
+Staff attendance, shift completion, leave requests and payroll readiness.
+
+![Staff Attendance & Payroll dashboard preview](docs/readme-dashboard-gallery/dashboard-11.svg)
+
+### 12. Hospital Analytics & Compliance
+
+Service performance, patient flow, audit tasks and operational reporting.
+
+![Hospital Analytics & Compliance dashboard preview](docs/readme-dashboard-gallery/dashboard-12.svg)
