@@ -25,20 +25,19 @@ r.post('/login', async (req, res, next) => {
 // SEND OTP
 r.post('/send-otp', async (req, res, next) => {
   try {
-    const { email, purpose } = req.body
-    if (purpose === 'reset') { const _u = await User.findOne({ email: email }); if (!_u) return res.status(404).json({ message: 'Plz enter your registered email address' }); };
-    if (!email || !['register', 'reset'].includes(purpose))
+    const { email, purpose } = req.body || {};
+    if (typeof email !== 'string' || !email.trim() || !['register', 'reset'].includes(purpose))
       return res.status(400).json({ message: 'Email and valid purpose required' });
-    const exists = await User.findOne({ email });
-    if (purpose === 'register' && exists)
-      return res.status(400).json({ message: 'This email already registered, plz login' });
-    if (purpose === 'reset' && !exists)
-      return res.status(404).json({ message: "This email doesn't exist, plz register first" });
-    await Otp.deleteMany({ email, purpose });
+    const normalizedEmail = email.trim().toLowerCase();
+    const exists = await User.findOne({ email: normalizedEmail });
+    const genericMessage = 'If this email is eligible, an OTP will be sent.';
+    if ((purpose === 'register' && exists) || (purpose === 'reset' && !exists))
+      return res.json({ message: genericMessage });
+    await Otp.deleteMany({ email: normalizedEmail, purpose });
     const otp = String(crypto.randomInt(100000, 1000000));
-    await Otp.create({ email, otp, purpose });
-    await sendOtpEmail(email, otp, purpose);
-    res.json({ message: 'OTP sent to your email' });
+    await Otp.create({ email: normalizedEmail, otp, purpose });
+    await sendOtpEmail(normalizedEmail, otp, purpose);
+    res.json({ message: genericMessage });
   } catch (e) { next(e); }
 });
 
