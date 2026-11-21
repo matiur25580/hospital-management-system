@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const patientSchema = new mongoose.Schema({
-  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', unique: true, sparse: true },
+  email: { type: String, lowercase: true, trim: true, index: true },
   patientId: { type: String, unique: true },
   name: { type: String, required: true },
   age: Number,
