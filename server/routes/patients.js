@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Patient = require('../models/Patient');
 const User = require('../models/User');
 const { protect, authorize } = require('../middleware/auth');
+const { canReadPatientList, canReadPatient } = require('../utils/patientAccess');
 const router = express.Router();
 
 const clinicalRoles = ['Admin', 'Doctor', 'Nurse', 'Receptionist'];
@@ -55,6 +56,9 @@ router.post('/', protect, authorize('Admin', 'Receptionist'), async (req, res) =
 
 router.get('/', protect, async (req, res) => {
   try {
+    if (!canReadPatientList(req.user)) {
+      return res.status(403).json({ message: 'Access denied: insufficient role.' });
+    }
     if (req.user.role === 'Patient') {
       const patients = await Patient.find({ userId: req.user.id }).sort({ createdAt: -1 });
       return res.json(patients);
@@ -74,10 +78,7 @@ router.get('/:id', protect, async (req, res) => {
   try {
     const patient = await Patient.findById(req.params.id);
     if (!patient) return res.status(404).json({ message: 'Patient not found.' });
-    if (req.user.role === 'Patient' && String(patient.userId) !== String(req.user.id)) {
-      return res.status(403).json({ message: 'You can only access your own patient record.' });
-    }
-    if (req.user.role !== 'Patient' && !clinicalRoles.includes(req.user.role)) {
+    if (!canReadPatient(req.user, patient)) {
       return res.status(403).json({ message: 'Access denied: insufficient role.' });
     }
     return res.json(patient);
