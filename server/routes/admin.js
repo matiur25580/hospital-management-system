@@ -20,7 +20,7 @@ r.get('/stats', protect, authorize('Admin'), async (req, res) => {
 });
 
 // GET /api/admin/users?role=Doctor
-r.get('/users', protect, async (req, res) => {
+r.get('/users', protect, authorize('Admin'), async (req, res) => {
   try {
     const q = {};
     if (req.query.role) q.role = req.query.role;
