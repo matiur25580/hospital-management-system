@@ -86,6 +86,19 @@ CLIENT_URL=http://localhost:5173
 PORT=5000
 ```
 
+Before the first login, provision exactly one administrator from the server environment. Set
+`BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL` and a unique
+`BOOTSTRAP_ADMIN_PASSWORD` (16-72 bytes), then run:
+
+```bash
+npm run bootstrap:admin
+```
+
+The command refuses to run once an Admin account exists. Remove the
+`BOOTSTRAP_ADMIN_*` values from the environment after successful setup.
+Public OTP registration creates Patient accounts only; staff roles must be
+created by an authenticated administrator.
+
 Start the API:
 
 ```bash

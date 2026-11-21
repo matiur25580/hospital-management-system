@@ -1,12 +1,12 @@
 const r = require('express').Router();
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
 const LabReport = require('../models/LabReport');
 const Prescription = require('../models/Prescription');
 
 // GET /api/admin/stats
-r.get('/stats', protect, async (req, res) => {
+r.get('/stats', protect, authorize('Admin'), async (req, res) => {
   try {
     const roles = ['Admin', 'Doctor', 'Nurse', 'Receptionist', 'Patient'];
     const counts = {};
@@ -20,7 +20,7 @@ r.get('/stats', protect, async (req, res) => {
 });
 
 // GET /api/admin/users?role=Doctor
-r.get('/users', protect, async (req, res) => {
+r.get('/users', protect, authorize('Admin'), async (req, res) => {
   try {
     const q = {};
     if (req.query.role) q.role = req.query.role;

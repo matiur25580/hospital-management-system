@@ -60,4 +60,49 @@ describe('Enterprise API checks', () => {
     const r = await request(base).get('/api/does-not-exist-xyz');
     expect(r.status).toBe(404);
   });
+
+  test('patient tokens cannot access admin or staff management endpoints', async () => {
+    const secret = process.env.JWT_SECRET || 'ci-test-jwt-secret-with-sufficient-entropy';
+    const token = require('jsonwebtoken').sign(
+      { id: '507f1f77bcf86cd799439011', role: 'Patient' },
+      secret,
+      { expiresIn: '5m' }
+    );
+    for (const [method, endpoint] of [
+      ['get', '/api/admin/stats'],
+      ['get', '/api/admin/users'],
+      ['post', '/api/staff/seed-management'],
+      ['post', '/api/staff/sync-users'],
+      ['post', '/api/staff/profiles'],
+      ['post', '/api/staff/salary/generate'],
+    ]) {
+      const response = await request(base)[method](endpoint)
+        .set('Authorization', 'Bearer ' + token)
+        .send({});
+      expect(response.status).toBe(403);
+    }
+  });
+
+  test('public registration cannot assign staff or administrator roles', async () => {
+    const payload = {
+      name: 'Demo Patient',
+      mobile: '9000000000',
+      email: 'role-escalation-test@example.invalid',
+      dob: '19900101',
+      password: 'DemoPassword123!',
+      otp: '123456',
+      role: 'Admin',
+    };
+    const verify = await request(base).post('/api/auth/verify-register').send(payload);
+    expect(verify.status).toBe(403);
+
+    const register = await request(base).post('/api/auth/register').send({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      otp: payload.otp,
+      role: 'Admin',
+    });
+    expect(register.status).toBe(400);
+  });
 });
