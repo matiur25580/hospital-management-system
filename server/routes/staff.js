@@ -54,8 +54,6 @@ const ROLE_DEFAULTS = {
 // POST /api/staff/seed-management - create 12 management logins + profiles
 r.post('/seed-management', protect, authorize('Admin'), async (req, res) => {
   try {
-    const nf = nameFieldOf();
-    const hashes = modelHashesPw();
     let created = 0;
     for (const m of MANAGEMENT) {
       if (await StaffProfile.findOne({ email: m.email })) continue;
