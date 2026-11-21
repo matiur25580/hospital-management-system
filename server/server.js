@@ -43,7 +43,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use('/api/auth', rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
-  standardHeaders: 'draft-8',
+  standardHeaders: true,
   legacyHeaders: false,
 }));
 
