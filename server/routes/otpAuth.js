@@ -3,8 +3,9 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
+const { ensurePatientProfile } = require('../utils/patientProfile');
 const { sendOtpEmail } = require('../utils/mailer');
-const signToken = (u) => jwt.sign({ id: u._id, role: u.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const signToken = (u) => jwt.sign({ id: u._id, role: u.role, email: u.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
 // LOGIN (email-exists message soho)
 r.post('/login', async (req, res, next) => {
@@ -67,6 +68,12 @@ r.post('/verify-register', async (req, res, next) => {
     let uniqueId = base, i = 1;
     while (await User.findOne({ uniqueId })) uniqueId = base + (i++);
     const user = await User.create({ name, mobile, email, dob, password, role, uniqueId });
+    try {
+      await ensurePatientProfile(user, mobile);
+    } catch (profileError) {
+      await User.deleteOne({ _id: user._id });
+      throw profileError;
+    }
     await Otp.deleteMany({ email, purpose: 'register' });
     res.status(201).json({ message: 'Registration successful', uniqueId,
       user: { id: user._id, name: user.fullName, email: user.email, role: user.role } });
