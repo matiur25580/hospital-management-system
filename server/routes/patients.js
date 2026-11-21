@@ -6,8 +6,6 @@ const { protect, authorize } = require('../middleware/auth');
 const { canReadPatientList, canReadPatient } = require('../utils/patientAccess');
 const router = express.Router();
 
-const clinicalRoles = ['Admin', 'Doctor', 'Nurse', 'Receptionist'];
-
 router.post('/', protect, authorize('Admin', 'Receptionist'), async (req, res) => {
   try {
     const { name, age, gender, phone, address, bloodGroup, emergencyContact, email } = req.body || {};
@@ -29,6 +27,19 @@ router.post('/', protect, authorize('Admin', 'Receptionist'), async (req, res) =
     const linkedUser = normalizedEmail
       ? await User.findOne({ email: normalizedEmail, role: 'Patient' }).select('_id')
       : null;
+    if (normalizedEmail) {
+      const existing = await Patient.findOne({ email: normalizedEmail });
+      if (existing) {
+        if (linkedUser && existing.userId && String(existing.userId) !== String(linkedUser._id)) {
+          return res.status(409).json({ message: 'This patient profile is linked to another account.' });
+        }
+        if (linkedUser && !existing.userId) {
+          existing.userId = linkedUser._id;
+          await existing.save();
+        }
+        return res.status(200).json(existing);
+      }
+    }
     if (linkedUser && await Patient.exists({ userId: linkedUser._id })) {
       return res.status(409).json({ message: 'A patient profile is already linked to this account.' });
     }
@@ -62,9 +73,6 @@ router.get('/', protect, async (req, res) => {
     if (req.user.role === 'Patient') {
       const patients = await Patient.find({ userId: req.user.id }).sort({ createdAt: -1 });
       return res.json(patients);
-    }
-    if (!clinicalRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: 'Access denied: insufficient role.' });
     }
     const patients = await Patient.find().sort({ createdAt: -1 }).limit(1000);
     return res.json(patients);
