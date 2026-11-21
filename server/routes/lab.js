@@ -2,6 +2,8 @@ const r = require('express').Router();
 const { protect } = require('../middleware/auth');
 const LabCatalog = require('../models/LabCatalog');
 const LabOrder = require('../models/LabOrder');
+const Patient = require('../models/Patient');
+const { canManageLabCatalog, canReadLabOrders, canCreateLabOrder, canProcessLabOrder } = require('../utils/labAccess');
 
 const DEFAULT_TESTS = [
   { code: 'CBC', name: 'Complete Blood Count (CBC)', category: 'Hematology', price: 350, sampleType: 'Blood', normalRange: 'As per age/sex', tatHours: 4 },
@@ -29,48 +31,116 @@ r.get('/catalog', protect, async (req, res) => {
 });
 
 r.post('/catalog', protect, async (req, res) => {
-  try { res.status(201).json(await LabCatalog.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  if (!canManageLabCatalog(req.user)) return res.status(403).json({ message: 'Only administrators can manage the lab catalogue.' });
+  try {
+    const { code, name, category, price, sampleType, normalRange, tatHours } = req.body;
+    if (typeof code !== 'string' || !code.trim() || typeof name !== 'string' || !name.trim() ||
+        !Number.isFinite(Number(price)) || Number(price) < 0) {
+      return res.status(400).json({ message: 'Valid test code, name and non-negative price are required.' });
+    }
+    res.status(201).json(await LabCatalog.create({
+      code: code.trim().toUpperCase(), name: name.trim(), category,
+      price: Number(price), sampleType, normalRange,
+      tatHours: Number.isFinite(Number(tatHours)) && Number(tatHours) > 0 ? Number(tatHours) : 4
+    }));
+  } catch (e) { res.status(400).json({ message: 'Could not create lab catalogue item.' }); }
 });
 
 // GET /api/lab/orders (?patientEmail=, ?status=)
 r.get('/orders', protect, async (req, res) => {
+  if (!canReadLabOrders(req.user)) return res.status(403).json({ message: 'Access denied.' });
   try {
     const q = {};
-    if (req.query.patientEmail) q.patientEmail = req.query.patientEmail;
-    if (req.query.status) q.status = req.query.status;
+    if (req.user.role === 'Patient') {
+      const email = String(req.user.email || '').trim().toLowerCase();
+      if (!email) return res.status(403).json({ message: 'Patient account is not linked to an email.' });
+      q.patientEmail = email;
+    } else if (req.query.patientEmail) {
+      q.patientEmail = String(req.query.patientEmail).trim().toLowerCase();
+    }
+    if (req.query.status) {
+      const status = String(req.query.status);
+      if (!['ordered', 'sample-collected', 'in-progress', 'reported'].includes(status)) {
+        return res.status(400).json({ message: 'Invalid lab order status.' });
+      }
+      q.status = status;
+    }
     res.json(await LabOrder.find(q).sort({ orderDate: -1 }).limit(100));
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) { res.status(500).json({ message: 'Could not load lab orders.' }); }
 });
 
 r.post('/orders', protect, async (req, res) => {
-  try { res.status(201).json(await LabOrder.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+  if (!canCreateLabOrder(req.user)) return res.status(403).json({ message: 'Only administrators and doctors can create lab orders.' });
+  try {
+    const patientEmail = String(req.body.patientEmail || '').trim().toLowerCase();
+    const codes = Array.isArray(req.body.tests) ? req.body.tests.map(test => String(test?.code || '').trim().toUpperCase()) : [];
+    if (!patientEmail || !codes.length || codes.some(code => !code) || new Set(codes).size !== codes.length) {
+      return res.status(400).json({ message: 'A patient email and a non-empty list of unique test codes are required.' });
+    }
+    const patient = await Patient.findOne({ email: patientEmail });
+    if (!patient) return res.status(404).json({ message: 'Patient profile not found.' });
+    const catalog = await LabCatalog.find({ code: { $in: codes } });
+    if (catalog.length !== codes.length) return res.status(400).json({ message: 'One or more selected lab tests are unavailable.' });
+    const byCode = new Map(catalog.map(test => [test.code, test]));
+    const tests = codes.map(code => {
+      const test = byCode.get(code);
+      return { code: test.code, name: test.name, price: test.price, normalRange: test.normalRange };
+    });
+    const totalAmount = tests.reduce((sum, test) => sum + Number(test.price || 0), 0);
+    if (!Number.isFinite(totalAmount) || totalAmount < 0) return res.status(400).json({ message: 'Invalid lab order total.' });
+    const order = await LabOrder.create({
+      patientName: patient.name, patientEmail, tests, totalAmount,
+      orderedBy: req.user.name || req.user.email || 'Clinical staff'
+    });
+    res.status(201).json(order);
+  } catch (e) { res.status(400).json({ message: 'Could not create lab order.' }); }
 });
 
 // PATCH /api/lab/orders/:id/collect
 r.patch('/orders/:id/collect', protect, async (req, res) => {
+  if (!canProcessLabOrder(req.user)) return res.status(403).json({ message: 'Access denied.' });
   try {
-    res.json(await LabOrder.findByIdAndUpdate(req.params.id,
-      { status: 'sample-collected', collectedBy: req.body.collectedBy }, { new: true }));
-  } catch (e) { res.status(400).json({ message: e.message }); }
+    const order = await LabOrder.findOneAndUpdate(
+      { _id: req.params.id, status: 'ordered' },
+      { $set: { status: 'sample-collected', collectedBy: req.user.name || req.user.email || 'Lab staff' } },
+      { new: true, runValidators: true }
+    );
+    if (!order) {
+      if (!await LabOrder.exists({ _id: req.params.id })) return res.status(404).json({ message: 'Lab order not found.' });
+      return res.status(409).json({ message: 'Only ordered lab requests can be collected.' });
+    }
+    res.json(order);
+  } catch (e) { res.status(400).json({ message: 'Could not collect lab sample.' }); }
 });
 
 // PATCH /api/lab/orders/:id/report { results: [{code, result, flag}], reportedBy }
 r.patch('/orders/:id/report', protect, async (req, res) => {
+  if (!canProcessLabOrder(req.user)) return res.status(403).json({ message: 'Access denied.' });
   try {
     const o = await LabOrder.findById(req.params.id);
-    if (!o) return res.status(404).json({ message: 'Not found' });
-    (req.body.results || []).forEach(rv => {
-      const tc = o.tests.find(t => t.code === rv.code);
-      if (tc) { tc.result = rv.result; tc.flag = rv.flag || 'normal'; }
-    });
+    if (!o) return res.status(404).json({ message: 'Lab order not found.' });
+    if (!['sample-collected', 'in-progress'].includes(o.status)) {
+      return res.status(409).json({ message: 'A sample must be collected before results can be reported.' });
+    }
+    if (!Array.isArray(req.body.results) || req.body.results.length > o.tests.length) {
+      return res.status(400).json({ message: 'Invalid lab results payload.' });
+    }
+    for (const rv of req.body.results) {
+      if (!rv || typeof rv.code !== 'string' || typeof rv.result !== 'string' ||
+          rv.result.length > 500 || !['normal', 'high', 'low'].includes(rv.flag || 'normal')) {
+        return res.status(400).json({ message: 'Invalid lab result entry.' });
+      }
+      const tc = o.tests.find(test => test.code === rv.code);
+      if (!tc) return res.status(400).json({ message: 'Result contains an unknown test code.' });
+      tc.result = rv.result.trim();
+      tc.flag = rv.flag || 'normal';
+    }
     const allDone = o.tests.length > 0 && o.tests.every(tc => tc.result && tc.result.trim() !== '');
     o.status = allDone ? 'reported' : 'in-progress';
-    if (allDone) { o.reportedBy = req.body.reportedBy; o.reportedAt = new Date(); }
+    if (allDone) { o.reportedBy = req.user.name || req.user.email || 'Lab staff'; o.reportedAt = new Date(); }
     await o.save();
     res.json(o);
-  } catch (e) { res.status(400).json({ message: e.message }); }
+  } catch (e) { res.status(400).json({ message: 'Could not save lab results.' }); }
 });
 
 module.exports = r;
