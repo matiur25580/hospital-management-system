@@ -16,7 +16,7 @@ async function main() {
   if (!mongoUri || !email || !name || typeof password !== 'string' || password.length < 16 || Buffer.byteLength(password, 'utf8') > 72) {
     throw new Error('Set MONGO_URI, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_NAME and a 16-72 byte BOOTSTRAP_ADMIN_PASSWORD.');
   }
-  if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new Error('BOOTSTRAP_ADMIN_EMAIL must be a valid email address.');
   }
 
