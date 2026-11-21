@@ -1,21 +1,10 @@
 const r = require('express').Router();
 const { protect, authorize } = require('../middleware/auth');
-const fs = require('fs');
-const path = require('path');
 const StaffProfile = require('../models/StaffProfile');
 const Salary = require('../models/Salary');
 const User = require('../models/User');
 const Department = require('../models/Department');
 
-let bcrypt = null;
-try { bcrypt = require('bcryptjs'); } catch (e) { try { bcrypt = require('bcrypt'); } catch (e2) {} }
-
-function modelHashesPw() {
-  try {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'models', 'User.js'), 'utf8');
-    return /pre\(['"]save['"]/.test(src) && /bcrypt/.test(src);
-  } catch (e) { return false; }
-}
 function nameFieldOf() {
   const paths = Object.keys(User.schema.paths);
   return ['fullName', 'name', 'full_name'].find(f => paths.includes(f)) || 'name';
@@ -70,12 +59,8 @@ r.post('/seed-management', protect, authorize('Admin'), async (req, res) => {
     let created = 0;
     for (const m of MANAGEMENT) {
       if (await StaffProfile.findOne({ email: m.email })) continue;
-      if (!await User.findOne({ email: m.email })) {
-        const pw = hashes ? 'Admin@123' : await bcrypt.hash('Admin@123', 10);
-        const doc = { email: m.email, role: 'Admin', password: pw, uniqueId: 'A' + m.name.replace(/[^A-Za-z]/g, '').slice(0, 6).toUpperCase() + '01011980' };
-        doc[nf] = m.name;
-        try { await User.create(doc); } catch (e) { /* skip */ }
-      }
+      // Seed directory profiles only. Never create shared-password administrator accounts.
+      // Login accounts must be provisioned through the secured administrator workflow.
       const u = await User.findOne({ email: m.email });
       await StaffProfile.create({ ...m, employeeId: await nextEmpId(), roleCategory: 'management', status: 'active', linkedUser: !!u, joinDate: '2024-01-15' });
       created++;
@@ -123,7 +108,7 @@ r.get('/hierarchy', protect, authorize('Admin'), async (req, res) => {
 });
 
 // GET /api/staff/profiles
-r.get('/profiles', protect, async (req, res) => {
+r.get('/profiles', protect, authorize('Admin'), async (req, res) => {
   try {
     const q = { status: 'active' };
     if (req.query.roleCategory) q.roleCategory = req.query.roleCategory;
@@ -132,14 +117,14 @@ r.get('/profiles', protect, async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-r.post('/profiles', protect, async (req, res) => {
+r.post('/profiles', protect, authorize('Admin'), async (req, res) => {
   try {
     if (!req.body.employeeId) req.body.employeeId = await nextEmpId();
     res.status(201).json(await StaffProfile.create(req.body));
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
-r.patch('/profiles/:id', protect, async (req, res) => {
+r.patch('/profiles/:id', protect, authorize('Admin'), async (req, res) => {
   try { res.json(await StaffProfile.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
@@ -161,7 +146,7 @@ function computeSalary(p) {
 }
 
 // POST /api/staff/salary/generate { month: YYYY-MM }
-r.post('/salary/generate', protect, async (req, res) => {
+r.post('/salary/generate', protect, authorize('Admin'), async (req, res) => {
   try {
     const { month } = req.body;
     if (!month) return res.status(400).json({ message: 'month required (YYYY-MM)' });
@@ -181,7 +166,7 @@ r.post('/salary/generate', protect, async (req, res) => {
 });
 
 // GET /api/staff/salary (?month=)
-r.get('/salary', protect, async (req, res) => {
+r.get('/salary', protect, authorize('Admin'), async (req, res) => {
   try {
     const q = req.query.month ? { month: req.query.month } : {};
     res.json(await Salary.find(q).sort({ staffName: 1 }).limit(500));
@@ -189,7 +174,7 @@ r.get('/salary', protect, async (req, res) => {
 });
 
 // PATCH /api/staff/salary/:id/pay
-r.patch('/salary/:id/pay', protect, async (req, res) => {
+r.patch('/salary/:id/pay', protect, authorize('Admin'), async (req, res) => {
   try { res.json(await Salary.findByIdAndUpdate(req.params.id, { status: 'paid', paidDate: new Date() }, { new: true })); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
