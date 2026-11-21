@@ -3,13 +3,14 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const Otp = require('../models/Otp');
+const { ensurePatientProfile } = require('../utils/patientProfile');
 const r = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET env variable is required');
 
 const signToken = (user) =>
-  jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+  jwt.sign({ id: user._id, role: user.role, email: user.email }, JWT_SECRET, { expiresIn: '8h' });
 
 // POST /api/auth/register
 r.post('/register',
@@ -33,6 +34,12 @@ r.post('/register',
         return res.status(400).json({ message: 'OTP verification failed' });
       await Otp.deleteMany({ email, purpose: 'register' });
       const user = await User.create({ name, email, password, role });
+      try {
+        await ensurePatientProfile(user, req.body.mobile || req.body.phone || 'Not provided');
+      } catch (profileError) {
+        await User.deleteOne({ _id: user._id });
+        throw profileError;
+      }
       res.status(201).json({
         token: signToken(user),
         user: { id: user._id, name: user.name, email: user.email, role: user.role },
