@@ -47,18 +47,18 @@ r.post('/verify-register', async (req, res, next) => {
     const { name, mobile, email, dob, password, otp, role: reqRole } = req.body;
     if (!name || !mobile || !email || !dob || !password || !otp)
       return res.status(400).json({ message: 'All fields are mandatory' });
+    if (reqRole && reqRole !== 'Patient') {
+      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
+    }
     const rec = await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
       return res.status(400).json({ message: 'Invalid OTP' });
     if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
-      await Otp.deleteMany({ email, purpose: 'reset' });
+      await Otp.deleteMany({ email, purpose: 'register' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
     if (await User.findOne({ email }))
       return res.status(400).json({ message: 'This email already registered, plz login' });
-    if (reqRole && reqRole !== 'Patient') {
-      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
-    }
     const role = 'Patient';
     const parts = String(name).trim().split(/\s+/);
     const fi = ((parts[0] && parts[0][0]) || 'X').toUpperCase();
