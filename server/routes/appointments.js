@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const DoctorSchedule = require('../models/DoctorSchedule');
 const Patient = require('../models/Patient');
+const User = require('../models/User');
 const { sendMail } = require('../utils/notify');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
@@ -17,7 +18,9 @@ router.post('/', protect, async (req, res) => {
     if (req.user.role === 'Patient') patient = await Patient.findOne({ userId: req.user.id });
     else patient = await Patient.findById(req.body.patient);
     if (!patient) return res.status(404).json({ message: 'Patient profile not found.' });
-    const doctorSchedule = await DoctorSchedule.findOne({ doctorEmail: (await require('../models/User').findById(doctor))?.email });
+    const doctorUser = await User.findOne({ _id: doctor, role: 'Doctor' }).select('_id email');
+    if (!doctorUser) return res.status(404).json({ message: 'Doctor not found.' });
+    const doctorSchedule = await DoctorSchedule.findOne({ doctorEmail: doctorUser.email });
     if (doctorSchedule) {
       const appointmentDate = new Date(date);
       const day = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
