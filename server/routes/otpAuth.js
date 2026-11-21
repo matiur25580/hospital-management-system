@@ -56,8 +56,10 @@ r.post('/verify-register', async (req, res, next) => {
     }
     if (await User.findOne({ email }))
       return res.status(400).json({ message: 'This email already registered, plz login' });
-    const allowedRoles = ['Admin','Doctor','Nurse','Receptionist','Patient'];
-    const role = allowedRoles.includes(reqRole) ? reqRole : 'Patient';
+    if (reqRole && reqRole !== 'Patient') {
+      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
+    }
+    const role = 'Patient';
     const parts = String(name).trim().split(/\s+/);
     const fi = ((parts[0] && parts[0][0]) || 'X').toUpperCase();
     const li = (parts.length > 1 && parts[parts.length-1][0] ? parts[parts.length-1][0] : 'X').toUpperCase();
