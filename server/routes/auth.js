@@ -16,7 +16,7 @@ r.post('/register',
   body('name').trim().notEmpty().withMessage('Name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
   body('password').isLength({ min: 6 }).withMessage('Password min 6 chars'),
-  body('role').optional().isIn(['Admin', 'Doctor', 'Receptionist']),
+  body('role').optional().equals('Patient'),
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
@@ -27,7 +27,7 @@ r.post('/register',
       const { otp } = req.body;
       const rec = await Otp.findOne({ email, password: 0, purpose: 'register' }).sort({ createdAt: -1 }).catch(()=>null);
       const rec2 = rec || await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
-      console.log('OTP DEBUG:', JSON.stringify({ email, otp, found: !!rec2, dbOtp: rec2 && rec2.otp, dbPurpose: rec2 && rec2.purpose }));
+      // Never write OTP values or verification secrets to application logs.
       const recF = rec2;
       if (!recF || String(recF.otp).trim() !== String(otp || '').trim())
         return res.status(400).json({ message: 'OTP verification failed' });
