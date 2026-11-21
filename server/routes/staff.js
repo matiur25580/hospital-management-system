@@ -1,5 +1,5 @@
 const r = require('express').Router();
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const fs = require('fs');
 const path = require('path');
 const StaffProfile = require('../models/StaffProfile');
@@ -63,7 +63,7 @@ const ROLE_DEFAULTS = {
 };
 
 // POST /api/staff/seed-management - create 12 management logins + profiles
-r.post('/seed-management', protect, async (req, res) => {
+r.post('/seed-management', protect, authorize('Admin'), async (req, res) => {
   try {
     const nf = nameFieldOf();
     const hashes = modelHashesPw();
@@ -85,7 +85,7 @@ r.post('/seed-management', protect, async (req, res) => {
 });
 
 // POST /api/staff/sync-users - profiles for existing doctors/nurses/receptionists
-r.post('/sync-users', protect, async (req, res) => {
+r.post('/sync-users', protect, authorize('Admin'), async (req, res) => {
   try {
     const nf = nameFieldOf();
     const depts = await Department.find();
@@ -113,7 +113,7 @@ r.post('/sync-users', protect, async (req, res) => {
 });
 
 // GET /api/staff/hierarchy - grouped by org level
-r.get('/hierarchy', protect, async (req, res) => {
+r.get('/hierarchy', protect, authorize('Admin'), async (req, res) => {
   try {
     const all = await StaffProfile.find({ status: 'active' }).sort({ level: 1, designation: 1 });
     const levels = {};
