@@ -1,55 +1,69 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
 const DoctorSchedule = require('../models/DoctorSchedule');
+const Patient = require('../models/Patient');
 const { sendMail } = require('../utils/notify');
 const { protect } = require('../middleware/auth');
 const router = express.Router();
+const clinicalRoles = ['Admin', 'Doctor', 'Nurse', 'Receptionist'];
 
-router.post('/', protect, async (req,res)=>{
-  try{
-    const { doctor, date } = req.body;
-    const count = await Appointment.countDocuments({doctor, date: new Date(date)});
-    // doctor schedule availability check (fail-open if no schedule set)
-    try {
-      const _dem = req.body.doctorEmail || req.body.doctor || '';
-      const _dt = req.body.date || req.body.appointmentDate || '';
-      if (_dem && _dt) {
-        const _s = await DoctorSchedule.findOne({ doctorEmail: _dem });
-        if (_s) {
-          const _d = new Date(_dt);
-          const _day = _d.toLocaleDateString('en-US', { weekday: 'long' });
-          const _slot = (_s.weekly || []).find(w => w.day === _day && w.active);
-          const _leave = (_s.leaves || []).some(l => new Date(l).toDateString() === _d.toDateString());
-          if (_leave || !_slot) return res.status(400).json({ message: 'Doctor not available on this date' });
-        }
-      }
-    } catch (_e) { console.error('schedule check failed:', _e.message); }
-    const appt = await Appointment.create({...req.body, tokenNo: count+1});
-      // notify patient: appointment confirmed
-      try {
-        sendMail(appt.patientEmail, 'Appointment Confirmed',
-          '<p>Dear ' + (appt.patientName || 'Patient') + ',</p>' +
-          '<p>Your appointment with <b>' + (appt.doctorName || appt.doctor || 'Doctor') + '</b> on <b>' + (appt.date || '') + '</b>' +
-          (appt.time ? ' at <b>' + appt.time + '</b>' : '') + ' is confirmed.</p>' +
-          '<p>Please arrive 15 minutes early.</p>');
-      } catch (_e2) { console.error('appointment mail failed:', _e2.message); }
-    req.app = req.app || {};
+router.post('/', protect, async (req, res) => {
+  try {
+    if (!['Patient', 'Admin', 'Receptionist'].includes(req.user.role)) return res.status(403).json({ message: 'Access denied.' });
+    const { doctor, date, timeSlot, symptoms } = req.body || {};
+    if (!mongoose.isValidObjectId(doctor) || !date || Number.isNaN(new Date(date).getTime())) return res.status(400).json({ message: 'Valid doctor and appointment date are required.' });
+    let patient;
+    if (req.user.role === 'Patient') patient = await Patient.findOne({ userId: req.user.id });
+    else patient = await Patient.findById(req.body.patient);
+    if (!patient) return res.status(404).json({ message: 'Patient profile not found.' });
+    const doctorSchedule = await DoctorSchedule.findOne({ doctorEmail: (await require('../models/User').findById(doctor))?.email });
+    if (doctorSchedule) {
+      const appointmentDate = new Date(date);
+      const day = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const slot = (doctorSchedule.weekly || []).find(item => item.day === day && item.active);
+      const leave = (doctorSchedule.leaves || []).some(item => new Date(item).toDateString() === appointmentDate.toDateString());
+      if (leave || !slot) return res.status(400).json({ message: 'Doctor not available on this date.' });
+    }
+    const count = await Appointment.countDocuments({ doctor, date: new Date(date) });
+    const appt = await Appointment.create({ patient: patient._id, doctor, date: new Date(date), timeSlot, symptoms, tokenNo: count + 1 });
+    try { await sendMail(patient.email, 'Appointment Confirmed', '<p>Your appointment is confirmed.</p>'); } catch (_) {}
     res.status(201).json(appt);
-  }catch(e){ res.status(500).json({message:e.message}); }
+  } catch (e) { res.status(400).json({ message: 'Could not create appointment.' }); }
 });
-router.get('/doctor/:doctorId', protect, async (req,res)=>{
-  const list = await Appointment.find({doctor: req.params.doctorId}).populate('patient').sort({tokenNo:1});
+
+router.get('/doctor/:doctorId', protect, async (req, res) => {
+  if (req.user.role === 'Doctor' && String(req.user.id) !== String(req.params.doctorId)) return res.status(403).json({ message: 'Access denied.' });
+  if (!['Admin', 'Doctor', 'Nurse', 'Receptionist'].includes(req.user.role)) return res.status(403).json({ message: 'Access denied.' });
+  if (!mongoose.isValidObjectId(req.params.doctorId)) return res.status(400).json({ message: 'Invalid doctor ID.' });
+  const list = await Appointment.find({ doctor: req.params.doctorId }).populate('patient').sort({ tokenNo: 1 });
   res.json(list);
 });
-router.patch('/:id/status', protect, async (req,res)=>{
-  const updated = await Appointment.findByIdAndUpdate(req.params.id, {status: req.body.status}, {new:true});
-  res.json(updated);
+
+router.patch('/:id/status', protect, async (req, res) => {
+  if (!['Admin', 'Doctor'].includes(req.user.role)) return res.status(403).json({ message: 'Access denied.' });
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid appointment ID.' });
+  const appointment = await Appointment.findById(req.params.id);
+  if (!appointment) return res.status(404).json({ message: 'Appointment not found.' });
+  if (req.user.role === 'Doctor' && String(appointment.doctor) !== String(req.user.id)) return res.status(403).json({ message: 'You can only update your own appointments.' });
+  const allowed = ['booked', 'in-queue', 'consulting', 'completed', 'cancelled'];
+  if (!allowed.includes(req.body.status)) return res.status(400).json({ message: 'Invalid appointment status.' });
+  appointment.status = req.body.status;
+  await appointment.save();
+  res.json(appointment);
 });
 
-router.get('/', protect, async (req,res)=>{
-  try{
-    const list = await Appointment.find().populate('patient').populate('doctor').sort({date:-1});
+router.get('/', protect, async (req, res) => {
+  try {
+    let filter;
+    if (req.user.role === 'Patient') {
+      const patient = await Patient.findOne({ userId: req.user.id }).select('_id');
+      if (!patient) return res.json([]);
+      filter = { patient: patient._id };
+    } else if (clinicalRoles.includes(req.user.role)) filter = {};
+    else return res.status(403).json({ message: 'Access denied.' });
+    const list = await Appointment.find(filter).populate('patient').populate('doctor').sort({ date: -1 }).limit(200);
     res.json(list);
-  }catch(e){ res.status(500).json({message:e.message}); }
+  } catch (e) { res.status(500).json({ message: 'Could not load appointments.' }); }
 });
 module.exports = router;
