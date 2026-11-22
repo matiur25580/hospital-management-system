@@ -28,7 +28,7 @@ r.post('/leave/apply', protect, async (req, res) => {
   try {
     if (!isStaff(req.user)) return res.status(403).json({ message: 'Staff access required' });
     const { leaveType, fromDate, toDate, reason } = req.body || {};
-    if (!['sick', 'casual', 'earned', 'maternity', 'paternity'].includes(leaveType) || !/^\\d{4}-\\d{2}-\\d{2}$/.test(fromDate || '') || !/^\\d{4}-\\d{2}-\\d{2}$/.test(toDate || '') || toDate < fromDate || !String(reason || '').trim()) return res.status(400).json({ message: 'Valid leave details are required' });
+    if (!['sick', 'casual', 'earned', 'maternity', 'paternity'].includes(leaveType) || !/^\d{4}-\d{2}-\d{2}$/.test(fromDate || '') || !/^\d{4}-\d{2}-\d{2}$/.test(toDate || '') || toDate < fromDate || !String(reason || '').trim()) return res.status(400).json({ message: 'Valid leave details are required' });
     const staff = await User.findById(req.user.id).select('name email role');
     if (!staff) return res.status(401).json({ message: 'Account unavailable' });
     const days = Math.round((new Date(toDate) - new Date(fromDate)) / 86400000) + 1;
@@ -69,7 +69,7 @@ r.post('/appraisal', protect, async (req, res) => {
     if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { staffEmail, reviewPeriod, ratings, strengths, improvements, goals, status } = req.body || {};
     const normalizedStaffEmail = String(staffEmail || '').trim().toLowerCase();
-    if (!normalizedStaffEmail || !/^\\d{4}-(H1|H2)$/.test(reviewPeriod || '') || !['draft', 'submitted'].includes(status)) return res.status(400).json({ message: 'Valid appraisal details are required' });
+    if (!normalizedStaffEmail || !/^\d{4}-(H1|H2)$/.test(reviewPeriod || '') || !['draft', 'submitted'].includes(status)) return res.status(400).json({ message: 'Valid appraisal details are required' });
     const keys = ['punctuality', 'patientCare', 'teamwork', 'skills', 'discipline'];
     const vals = keys.map(key => Number(ratings && ratings[key]));
     if (vals.some(value => !Number.isInteger(value) || value < 1 || value > 5)) return res.status(400).json({ message: 'Ratings must be integers from 1 to 5' });
@@ -156,7 +156,7 @@ r.patch('/recruitment/applicants/:id', protect, async (req, res) => {
     const allowedFrom = { screening: ['applied'], interview: ['screening'], offered: ['interview'], rejected: ['applied', 'screening', 'interview', 'offered'] };
     const update = { stage, remarks: String(remarks || '').slice(0, 2000), decidedBy: actorEmail(req.user) };
     if (stage === 'interview') {
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(interviewDate || '')) return res.status(400).json({ message: 'Valid interview date required' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(interviewDate || '')) return res.status(400).json({ message: 'Valid interview date required' });
       update.interviewDate = interviewDate;
     }
     const doc = await Applicant.findOneAndUpdate({ _id: req.params.id, stage: { $in: allowedFrom[stage] } }, { $set: update }, { new: true, runValidators: true });
