@@ -1,7 +1,5 @@
 const r = require('express').Router();
 const { protect } = require('../middleware/auth');
-const fs = require('fs');
-const path = require('path');
 const LeaveRequest = require('../models/LeaveRequest');
 const Appraisal = require('../models/Appraisal');
 const JobPosting = require('../models/JobPosting');
@@ -12,19 +10,6 @@ const User = require('../models/User');
 const STAFF_ROLES = new Set(['Doctor', 'Nurse', 'Receptionist']);
 const isStaff = user => Boolean(user && STAFF_ROLES.has(user.role) && user.email);
 const actorEmail = user => String(user && user.email || '').trim().toLowerCase();
-
-let bcrypt = null;
-try { bcrypt = require('bcryptjs'); } catch (e) { try { bcrypt = require('bcrypt'); } catch (e2) {} }
-function modelHashesPw() {
-  try {
-    const src = fs.readFileSync(path.join(__dirname, '..', 'models', 'User.js'), 'utf8');
-    return /pre\(['"]save['"]/.test(src) && /bcrypt/.test(src);
-  } catch (e) { return false; }
-}
-function nameFieldOf() {
-  const paths = Object.keys(User.schema.paths);
-  return ['fullName', 'name', 'full_name'].find(f => paths.includes(f)) || 'name';
-}
 
 // ---------------- Leave ----------------
 r.get('/leave', protect, async (req, res) => {
@@ -210,16 +195,9 @@ r.post('/recruitment/applicants/:id/hire', protect, async (req, res) => {
       status: 'active', linkedUser: false, joinDate: new Date().toISOString().slice(0, 10)
     });
 
-    if (userRole && !await User.findOne({ email: ap.email })) {
-      const nf = nameFieldOf();
-      const hashes = modelHashesPw();
-      const pw = userRole === 'Admin' ? 'Admin@123' : 'Staff@123';
-      const doc = { email: ap.email, role: userRole, password: hashes ? pw : await bcrypt.hash(pw, 10), uniqueId: 'H' + ap.name.replace(/[^A-Za-z]/g, '').slice(0, 6).toUpperCase() + '01011990' };
-      doc[nf] = ap.name;
-      try { await User.create(doc); profile.linkedUser = true; await profile.save(); } catch (e) { /* skip */ }
-    }
+    // Account credentials are provisioned separately; never create staff accounts with shared default passwords.
     ap.stage = 'hired'; ap.decidedBy = actorEmail(req.user); await ap.save();
-    res.json({ profile, userRole: userRole || 'none (staff only)' });
+    res.json({ profile, userRole: userRole || roleCategory, accountProvisioning: 'required' });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
