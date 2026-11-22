@@ -1,90 +1,13 @@
-const r = require('express').Router();
-const { protect } = require('../middleware/auth');
-const Medicine = require('../models/Medicine');
-const Dispense = require('../models/Dispense');
-
-// GET /api/pharmacy (?lowStock=true)
-r.get('/', protect, async (req, res) => {
-  try {
-    let list = await Medicine.find().sort({ name: 1 });
-    if (req.query.lowStock === 'true') list = list.filter(m => m.quantity <= m.minStock);
-    res.json(list);
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// POST /api/pharmacy -> add medicine
-r.post('/', protect, async (req, res) => {
-  try { res.status(201).json(await Medicine.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-// PATCH /api/pharmacy/:id -> update medicine
-r.patch('/:id', protect, async (req, res) => {
-  try { res.json(await Medicine.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
-  catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// DELETE /api/pharmacy/:id
-r.delete('/:id', protect, async (req, res) => {
-  try { await Medicine.findByIdAndDelete(req.params.id); res.json({ message: 'deleted' }); }
-  catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// POST /api/pharmacy/:id/dispense -> reduce stock + record
-r.post('/:id/dispense', protect, async (req, res) => {
-  try {
-    const m = await Medicine.findById(req.params.id);
-    if (!m) return res.status(404).json({ message: 'Medicine not found' });
-    const qty = Number(req.body.quantity) || 0;
-    if (qty <= 0) return res.status(400).json({ message: 'Invalid quantity' });
-    if (m.quantity < qty) return res.status(400).json({ message: 'Insufficient stock. Available: ' + m.quantity });
-    m.quantity -= qty;
-    await m.save();
-    const d = await Dispense.create({
-      medicineId: m._id, medicineName: m.name, quantity: qty,
-      patientName: req.body.patientName, patientEmail: req.body.patientEmail,
-      caseId: req.body.caseId, dispensedBy: req.user.email || req.user.name
-    });
-    res.status(201).json({ medicine: m, dispense: d, lowStock: m.quantity <= m.minStock });
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// POST /api/pharmacy/:id/restock -> add stock
-r.post('/:id/restock', protect, async (req, res) => {
-  try {
-    const m = await Medicine.findById(req.params.id);
-    if (!m) return res.status(404).json({ message: 'Medicine not found' });
-    const qty = Number(req.body.quantity) || 0;
-    if (qty <= 0) return res.status(400).json({ message: 'Invalid quantity' });
-    m.quantity += qty;
-    if (req.body.batchNo) m.batchNo = req.body.batchNo;
-    if (req.body.expiryDate) m.expiryDate = req.body.expiryDate;
-    await m.save();
-    res.json(m);
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// GET /api/pharmacy/alerts/low-stock
-r.get('/alerts/low-stock', protect, async (req, res) => {
-  try {
-    const all = await Medicine.find().sort({ quantity: 1 });
-    res.json(all.filter(m => m.quantity <= m.minStock));
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// GET /api/pharmacy/alerts/expiry (?days=30)
-r.get('/alerts/expiry', protect, async (req, res) => {
-  try {
-    const days = Number(req.query.days) || 30;
-    const cutoff = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
-    res.json(await Medicine.find({ expiryDate: { $lte: cutoff } }).sort({ expiryDate: 1 }));
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// GET /api/pharmacy/dispenses -> dispense history
-r.get('/dispenses/history', protect, async (req, res) => {
-  try { res.json(await Dispense.find().sort({ date: -1 }).limit(100)); }
-  catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-module.exports = r;
+const r=require('express').Router();const {protect}=require('../middleware/auth');const Medicine=require('../models/Medicine');const Dispense=require('../models/Dispense');const Patient=require('../models/Patient');const PatientCase=require('../models/PatientCase');
+const STAFF=['Admin','Doctor','Nurse','Receptionist'];const CLINICAL=['Admin','Doctor','Nurse'];const isStaff=u=>u&&STAFF.includes(u.role);const canManage=u=>u&&u.role==='Admin';const canDispense=u=>u&&CLINICAL.includes(u.role);
+function validPositiveInteger(v){return Number.isSafeInteger(Number(v))&&Number(v)>0;}
+r.get('/',protect,async(req,res)=>{if(!isStaff(req.user))return res.status(403).json({message:'Access denied.'});try{let list=await Medicine.find().sort({name:1});if(req.query.lowStock==='true')list=list.filter(m=>m.quantity<=m.minStock);res.json(list);}catch(e){res.status(500).json({message:'Could not load pharmacy inventory.'});}});
+r.post('/',protect,async(req,res)=>{if(!canManage(req.user))return res.status(403).json({message:'Only administrators can add medicines.'});try{const data={};for(const k of ['name','genericName','batchNo','quantity','unit','price','expiryDate','minStock','supplier'])if(req.body[k]!==undefined)data[k]=req.body[k];if(data.quantity!==undefined&&(!Number.isSafeInteger(Number(data.quantity))||Number(data.quantity)<0))return res.status(400).json({message:'Invalid stock quantity.'});res.status(201).json(await Medicine.create(data));}catch(e){res.status(400).json({message:'Could not add medicine.'});}});
+r.patch('/:id',protect,async(req,res)=>{if(!canManage(req.user))return res.status(403).json({message:'Only administrators can update medicine details.'});try{const data={};for(const k of ['name','genericName','batchNo','unit','price','expiryDate','minStock','supplier'])if(req.body[k]!==undefined)data[k]=req.body[k];const m=await Medicine.findByIdAndUpdate(req.params.id,{$set:data},{new:true,runValidators:true});if(!m)return res.status(404).json({message:'Medicine not found.'});res.json(m);}catch(e){res.status(400).json({message:'Could not update medicine.'});}});
+r.delete('/:id',protect,async(req,res)=>{if(!canManage(req.user))return res.status(403).json({message:'Only administrators can delete medicines.'});try{const m=await Medicine.findByIdAndDelete(req.params.id);if(!m)return res.status(404).json({message:'Medicine not found.'});res.json({message:'deleted'});}catch(e){res.status(500).json({message:'Could not delete medicine.'});}});
+r.post('/:id/dispense',protect,async(req,res)=>{if(!canDispense(req.user))return res.status(403).json({message:'Only clinical staff can dispense medicines.'});let decremented=false;try{const qty=Number(req.body.quantity);if(!validPositiveInteger(qty))return res.status(400).json({message:'Quantity must be a positive whole number.'});const patientEmail=String(req.body.patientEmail||'').trim().toLowerCase();const patient=await Patient.findOne({email:patientEmail}).select('name email');if(!patient)return res.status(404).json({message:'Patient profile not found.'});if(req.body.caseId){const c=await PatientCase.findOne({_id:req.body.caseId,patientEmail});if(!c)return res.status(404).json({message:'Patient case not found.'});}const m=await Medicine.findOneAndUpdate({_id:req.params.id,quantity:{$gte:qty}},{$inc:{quantity:-qty}},{new:true,runValidators:true});if(!m){const exists=await Medicine.exists({_id:req.params.id});return res.status(exists?409:404).json({message:exists?'Insufficient stock.':'Medicine not found.'});}decremented=true;const d=await Dispense.create({medicineId:m._id,medicineName:m.name,quantity:qty,patientName:patient.name,patientEmail:patient.email,caseId:req.body.caseId||undefined,dispensedBy:req.user.email||req.user.name});decremented=false;res.status(201).json({medicine:m,dispense:d,lowStock:m.quantity<=m.minStock});}catch(e){if(decremented)await Medicine.updateOne({_id:req.params.id},{$inc:{quantity:Number(req.body.quantity)}}).catch(()=>{});res.status(500).json({message:'Could not record medicine dispense.'});}});
+r.post('/:id/restock',protect,async(req,res)=>{if(!canManage(req.user))return res.status(403).json({message:'Only administrators can restock medicines.'});try{const qty=Number(req.body.quantity);if(!validPositiveInteger(qty))return res.status(400).json({message:'Quantity must be a positive whole number.'});const update={$inc:{quantity:qty}};if(req.body.batchNo!==undefined)update.$set={...(update.$set||{}),batchNo:String(req.body.batchNo)};if(req.body.expiryDate!==undefined)update.$set={...(update.$set||{}),expiryDate:req.body.expiryDate};const m=await Medicine.findByIdAndUpdate(req.params.id,update,{new:true,runValidators:true});if(!m)return res.status(404).json({message:'Medicine not found.'});res.json(m);}catch(e){res.status(400).json({message:'Could not restock medicine.'});}});
+r.get('/alerts/low-stock',protect,async(req,res)=>{if(!isStaff(req.user))return res.status(403).json({message:'Access denied.'});try{const all=await Medicine.find().sort({quantity:1});res.json(all.filter(m=>m.quantity<=m.minStock));}catch(e){res.status(500).json({message:'Could not load stock alerts.'});}});
+r.get('/alerts/expiry',protect,async(req,res)=>{if(!isStaff(req.user))return res.status(403).json({message:'Access denied.'});try{const days=Number(req.query.days)||30;if(!Number.isSafeInteger(days)||days<1||days>365)return res.status(400).json({message:'Invalid expiry window.'});const cutoff=new Date(Date.now()+days*86400000);res.json(await Medicine.find({expiryDate:{$lte:cutoff}}).sort({expiryDate:1}));}catch(e){res.status(500).json({message:'Could not load expiry alerts.'});}});
+r.get('/dispenses/history',protect,async(req,res)=>{if(!isStaff(req.user))return res.status(403).json({message:'Access denied.'});try{res.json(await Dispense.find().sort({date:-1}).limit(100));}catch(e){res.status(500).json({message:'Could not load dispense history.'});}});
+module.exports=r;
