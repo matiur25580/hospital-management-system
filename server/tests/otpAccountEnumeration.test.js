@@ -52,4 +52,28 @@ describe('OTP request account enumeration protection', () => {
     expect(Otp.create).toHaveBeenCalledWith(expect.objectContaining({ email: 'user@example.com', purpose: 'reset' }));
     expect(sendOtpEmail).toHaveBeenCalledTimes(1);
   });
+  test('OTP login returns the same generic failure for unknown accounts, wrong passwords and role mismatch', async () => {
+    const outcomes = [];
+    User.findOne.mockResolvedValueOnce(null);
+    let res = response();
+    await global.otpHandlers['/login']({ body: { email: 'missing@example.com', password: 'secret' } }, res, jest.fn());
+    outcomes.push({ status: res.statusCode, message: res.body.message });
+
+    User.findOne.mockResolvedValueOnce({ compare: jest.fn().mockResolvedValue(false) });
+    res = response();
+    await global.otpHandlers['/login']({ body: { email: 'known@example.com', password: 'wrong' } }, res, jest.fn());
+    outcomes.push({ status: res.statusCode, message: res.body.message });
+
+    User.findOne.mockResolvedValueOnce({ role: 'Doctor', compare: jest.fn().mockResolvedValue(true) });
+    res = response();
+    await global.otpHandlers['/login']({ body: { email: 'known@example.com', password: 'secret', role: 'Patient' } }, res, jest.fn());
+    outcomes.push({ status: res.statusCode, message: res.body.message });
+
+    expect(outcomes).toEqual([
+      { status: 401, message: 'Invalid email or password' },
+      { status: 401, message: 'Invalid email or password' },
+      { status: 401, message: 'Invalid email or password' }
+    ]);
+  });
+
 });
