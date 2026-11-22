@@ -1,6 +1,7 @@
 const r = require('express').Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { protect } = require('../middleware/auth');
 const LabReport = require('../models/LabReport');
 const Patient = require('../models/Patient');
@@ -8,6 +9,7 @@ const { clinicalRoles } = require('../utils/patientAccess');
 const { canReadLabReportFile } = require('../utils/labReportFileAccess');
 
 const UPLOAD_DIR = path.resolve(__dirname, '../uploads');
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_'))
@@ -16,7 +18,14 @@ const allowedMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/png'])
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, allowedMimeTypes.has(file.mimetype))
+  fileFilter: (req, file, cb) => {
+    if (!allowedMimeTypes.has(file.mimetype)) {
+      const error = new Error('Only PDF, JPEG and PNG attachments are supported.');
+      error.status = 400;
+      return cb(error);
+    }
+    return cb(null, true);
+  }
 });
 
 r.get('/', protect, async (req, res) => {
