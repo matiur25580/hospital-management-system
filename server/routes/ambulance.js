@@ -2,16 +2,13 @@ const r = require('express').Router();
 const { protect } = require('../middleware/auth');
 const Ambulance = require('../models/Ambulance');
 const AmbulanceTrip = require('../models/AmbulanceTrip');
-
-const canOperate = user => Boolean(user && ['Admin', 'Receptionist'].includes(user.role));
-const canAdmin = user => Boolean(user && user.role === 'Admin');
+const { canOperateAmbulance, canAdministerFleet, allowedTripTransitions } = require('../utils/ambulanceAccess');
 const actorEmail = user => String(user && user.email || '').trim().toLowerCase();
 const textField = (value, max = 160) => String(value || '').trim().slice(0, max);
-const ACTIVE_TRIP_STATES = ['dispatched', 'en-route', 'on-scene', 'to-hospital'];
 
 r.get('/', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     const q = {};
     if (req.query.status) {
       if (!['available', 'on-trip', 'maintenance'].includes(req.query.status)) return res.status(400).json({ message: 'Invalid ambulance status' });
@@ -23,14 +20,14 @@ r.get('/', protect, async (req, res) => {
 
 r.get('/vehicles', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     res.json(await Ambulance.find().sort({ vehicleNo: 1 }));
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 r.post('/seed', protect, async (req, res) => {
   try {
-    if (!canAdmin(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    if (!canAdministerFleet(req.user)) return res.status(403).json({ message: 'Admin access required' });
     if (await Ambulance.countDocuments()) return res.json({ seeded: 0, message: 'Fleet already exists' });
     const defaults = [
       { vehicleNo: 'WB-01-AMB-001', driverName: 'Ambulance Driver 1', type: 'basic', status: 'available', baseLocation: 'Hospital' },
@@ -44,7 +41,7 @@ r.post('/seed', protect, async (req, res) => {
 
 r.post('/', protect, async (req, res) => {
   try {
-    if (!canAdmin(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    if (!canAdministerFleet(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { vehicleNo, type, driverName, driverPhone, currentLocation, baseLocation } = req.body || {};
     if (!textField(vehicleNo, 40) || !['basic', 'advanced', 'icu'].includes(type)) return res.status(400).json({ message: 'Valid vehicle number and type are required' });
     const ambulance = await Ambulance.create({
@@ -57,7 +54,7 @@ r.post('/', protect, async (req, res) => {
 
 r.patch('/:id', protect, async (req, res) => {
   try {
-    if (!canAdmin(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    if (!canAdministerFleet(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { status, driverName, driverPhone, baseLocation } = req.body || {};
     const update = {};
     if (status !== undefined) {
@@ -79,7 +76,7 @@ r.patch('/:id', protect, async (req, res) => {
 
 r.delete('/:id', protect, async (req, res) => {
   try {
-    if (!canAdmin(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    if (!canAdministerFleet(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const ambulance = await Ambulance.findOneAndDelete({ _id: req.params.id, status: { $ne: 'on-trip' } });
     if (!ambulance) return res.status(409).json({ message: 'Ambulance not found or currently on a trip' });
     res.json({ message: 'deleted' });
@@ -89,14 +86,14 @@ r.delete('/:id', protect, async (req, res) => {
 // AmbulanceMgmt request queue (request first, allocate a vehicle after review).
 r.get('/dispatch', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     res.json(await AmbulanceTrip.find({ status: { $in: ['requested', 'dispatched', 'arrived', 'completed', 'cancelled'] } }).sort({ dispatchedAt: -1 }).limit(100));
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 r.post('/dispatch', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     const { patientName, patientPhone, pickupLocation, destination, emergencyType, notes } = req.body || {};
     if (!textField(patientName) || !textField(pickupLocation, 300)) return res.status(400).json({ message: 'Patient name and pickup location are required' });
     const trip = await AmbulanceTrip.create({
@@ -111,7 +108,7 @@ r.post('/dispatch', protect, async (req, res) => {
 
 r.patch('/dispatch/:id', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     const { status, ambulanceId } = req.body || {};
     const existing = await AmbulanceTrip.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Dispatch request not found' });
@@ -179,7 +176,7 @@ r.patch('/dispatch/:id', protect, async (req, res) => {
 // AmbulanceTracking workflow: reserve an available vehicle and create an active trip.
 r.get('/trips', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     const q = {};
     if (req.query.status) q.status = req.query.status;
     if (req.query.active === 'true' || req.query.active === '1') q.status = { $nin: ['completed', 'cancelled'] };
@@ -189,7 +186,7 @@ r.get('/trips', protect, async (req, res) => {
 
 r.post('/trips', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     const { ambulanceId, patientName, patientPhone, pickupLocation, destination, notes } = req.body || {};
     if (!ambulanceId || !textField(patientName) || !textField(pickupLocation, 300)) return res.status(400).json({ message: 'Ambulance, patient and pickup location are required' });
     const ambulance = await Ambulance.findOneAndUpdate(
@@ -217,23 +214,15 @@ r.post('/trips', protect, async (req, res) => {
 
 r.patch('/trips/:id', protect, async (req, res) => {
   try {
-    if (!canOperate(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
+    if (!canOperateAmbulance(req.user)) return res.status(403).json({ message: 'Admin or Receptionist access required' });
     const existing = await AmbulanceTrip.findById(req.params.id);
     if (!existing) return res.status(404).json({ message: 'Trip not found' });
     const body = req.body || {};
     const update = {};
     if (body.currentLocation !== undefined) update.currentLocation = textField(body.currentLocation, 300);
     if (body.notes !== undefined) update.notes = textField(body.notes, 2000);
-    const transitions = {
-      dispatched: ['en-route', 'cancelled'],
-      'en-route': ['on-scene', 'cancelled'],
-      'on-scene': ['to-hospital', 'cancelled'],
-      'to-hospital': ['completed', 'cancelled'],
-      completed: [],
-      cancelled: []
-    };
     if (body.status !== undefined) {
-      if (!transitions[existing.status] || !transitions[existing.status].includes(body.status)) return res.status(409).json({ message: 'Invalid trip status transition' });
+      if (!allowedTripTransitions(existing.status).includes(body.status)) return res.status(409).json({ message: 'Invalid trip status transition' });
       update.status = body.status;
       const stageKey = { 'en-route': 'enRoute', 'on-scene': 'onScene', 'to-hospital': 'toHospital', completed: 'completed' }[body.status];
       if (stageKey) update['stages.' + stageKey] = new Date();
