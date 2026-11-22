@@ -1,30 +1,7 @@
-const r = require('express').Router();
-const { protect } = require('../middleware/auth');
-const Payment = require('../models/Payment');
-
-// GET /api/payments (?patientEmail=)
-r.get('/', protect, async (req, res) => {
-  try {
-    const q = req.query.patientEmail ? { patientEmail: req.query.patientEmail } : {};
-    res.json(await Payment.find(q).sort({ createdAt: -1 }).limit(100));
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// PATCH /api/payments/:id/pay -> record a payment (partial allowed, never over due)
-r.patch('/:id/pay', protect, async (req, res) => {
-  try {
-    const p = await Payment.findById(req.params.id);
-    if (!p) return res.status(404).json({ message: 'Bill not found' });
-    const amt = Number(req.body.amount) || 0;
-    if (amt <= 0) return res.status(400).json({ message: 'Invalid amount' });
-    const due = p.totalAmount - p.paidAmount;
-    if (amt > due) return res.status(400).json({ message: 'Amount exceeds due (Rs. ' + due + ')' });
-    p.payments.push({ amount: amt, method: req.body.method || 'cash', receivedBy: req.body.receivedBy });
-    p.paidAmount += amt;
-    p.status = p.paidAmount >= p.totalAmount ? 'paid' : 'partial';
-    await p.save();
-    res.json(p);
-  } catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-module.exports = r;
+const r=require('express').Router();const {protect}=require('../middleware/auth');const Payment=require('../models/Payment');const {patientEmailFor,canReadClinicalRecords,canManageBilling}=require('../utils/clinicalRecordAccess');
+r.get('/',protect,async(req,res)=>{if(!canReadClinicalRecords(req.user))return res.status(403).json({message:'Access denied.'});try{const own=patientEmailFor(req.user),requested=String(req.query.patientEmail||'').trim().toLowerCase();const filter=own?{patientEmail:own}:(requested?{patientEmail:requested}:{});res.json(await Payment.find(filter).sort({createdAt:-1}).limit(100));}catch(e){res.status(500).json({message:'Could not load payments.'});}});
+r.patch('/:id/pay',protect,async(req,res)=>{if(!canManageBilling(req.user))return res.status(403).json({message:'Only authorized billing staff can record payments.'});try{
+ const amount=Number(req.body.amount);if(!Number.isFinite(amount)||amount<=0||!Number.isSafeInteger(Math.round(amount*100)))return res.status(400).json({message:'Invalid amount.'});const method=['cash','card','upi','other'].includes(req.body.method)?req.body.method:null;if(!method)return res.status(400).json({message:'Invalid payment method.'});const current=await Payment.findById(req.params.id);if(!current)return res.status(404).json({message:'Bill not found.'});const due=Number(current.totalAmount)-Number(current.paidAmount);if(amount>due)return res.status(400).json({message:'Amount exceeds due.'});const nextPaid=Number(current.paidAmount)+amount;
+ const updated=await Payment.findOneAndUpdate({_id:current._id,paidAmount:current.paidAmount,totalAmount:current.totalAmount,status:{$ne:'paid'}},{$inc:{paidAmount:amount},$push:{payments:{amount,method,receivedBy:req.user.name||req.user.email}},$set:{status:nextPaid>=Number(current.totalAmount)?'paid':'partial'}},{new:true,runValidators:true});if(!updated)return res.status(409).json({message:'Bill changed concurrently. Refresh and retry.'});res.json(updated);
+ }catch(e){res.status(400).json({message:'Could not record payment.'});}});
+module.exports=r;
