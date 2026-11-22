@@ -1,30 +1,6 @@
-const r = require('express').Router();
-const { protect } = require('../middleware/auth');
-const Discharge = require('../models/Discharge');
-
-// GET /api/discharge (?patientEmail=, ?status=)
-r.get('/', protect, async (req, res) => {
-  try {
-    const q = {};
-    if (req.query.patientEmail) q.patientEmail = req.query.patientEmail;
-    if (req.query.status) q.status = req.query.status;
-    res.json(await Discharge.find(q).sort({ createdAt: -1 }).limit(100));
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-r.post('/', protect, async (req, res) => {
-  try { res.status(201).json(await Discharge.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-r.patch('/:id', protect, async (req, res) => {
-  try { res.json(await Discharge.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-r.delete('/:id', protect, async (req, res) => {
-  try { await Discharge.findByIdAndDelete(req.params.id); res.json({ ok: true }); }
-  catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-module.exports = r;
+const r=require('express').Router();const {protect}=require('../middleware/auth');const Discharge=require('../models/Discharge');const {patientEmailFor,canReadClinicalRecords,canManageDischarge}=require('../utils/clinicalRecordAccess');const FIELDS=['patientName','patientEmail','admissionDate','dischargeDate','department','doctorName','diagnosis','proceduresDone','treatmentGiven','medications','followUpDate','followUpDoctor','dietAdvice','activityAdvice','conditionOnDischarge','status'];
+r.get('/',protect,async(req,res)=>{if(!canReadClinicalRecords(req.user))return res.status(403).json({message:'Access denied.'});try{const own=patientEmailFor(req.user),filter={};if(own)filter.patientEmail=own;else{if(req.query.patientEmail)filter.patientEmail=String(req.query.patientEmail).trim().toLowerCase();if(req.query.status)filter.status=req.query.status;}res.json(await Discharge.find(filter).sort({createdAt:-1}).limit(100));}catch(e){res.status(500).json({message:'Could not load discharge records.'});}});
+r.post('/',protect,async(req,res)=>{if(!canManageDischarge(req.user))return res.status(403).json({message:'Only doctors or administrators can prepare discharge records.'});try{const data={};for(const k of FIELDS)if(req.body[k]!==undefined)data[k]=req.body[k];data.preparedBy=req.user.name||req.user.email;const d=await Discharge.create(data);res.status(201).json(d);}catch(e){res.status(400).json({message:'Could not create discharge record.'});}});
+r.patch('/:id',protect,async(req,res)=>{if(!canManageDischarge(req.user))return res.status(403).json({message:'Only doctors or administrators can update discharge records.'});try{const data={};for(const k of FIELDS)if(req.body[k]!==undefined)data[k]=req.body[k];const d=await Discharge.findByIdAndUpdate(req.params.id,{$set:data},{new:true,runValidators:true});if(!d)return res.status(404).json({message:'Discharge record not found.'});res.json(d);}catch(e){res.status(400).json({message:'Could not update discharge record.'});}});
+r.delete('/:id',protect,async(req,res)=>{if(req.user.role!=='Admin')return res.status(403).json({message:'Only administrators can delete discharge records.'});try{const d=await Discharge.findByIdAndDelete(req.params.id);if(!d)return res.status(404).json({message:'Discharge record not found.'});res.json({ok:true});}catch(e){res.status(500).json({message:'Could not delete discharge record.'});}});
+module.exports=r;
