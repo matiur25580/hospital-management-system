@@ -3,6 +3,7 @@ const { protect } = require('../middleware/auth');
 const OTRoom = require('../models/OTRoom');
 const OTSurgery = require('../models/OTSurgery');
 const User = require('../models/User');
+const { canManageOT } = require('../utils/hrOtAccess');
 
 const DEFAULT_OTS = [
   { otNo: 'OT-1', floor: '3rd Floor, OT Complex', type: 'General Surgery' },
@@ -10,7 +11,7 @@ const DEFAULT_OTS = [
   { otNo: 'OT-3', floor: '3rd Floor, OT Complex', type: 'Gynecology' },
   { otNo: 'OT-4', floor: 'Ground Floor, Emergency', type: 'Emergency (24x7)' }
 ];
-const adminOnly = (req, res) => req.user && req.user.role === 'Admin' ? true : (res.status(403).json({ message: 'Admin access required' }), false);
+const adminOnly = (req, res) => canManageOT(req.user) ? true : (res.status(403).json({ message: 'Admin access required' }), false);
 const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(new Date(value).getTime());
 const validTime = value => /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value || '');
 
