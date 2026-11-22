@@ -2,33 +2,57 @@ const r = require('express').Router();
 const { protect } = require('../middleware/auth');
 const Inventory = require('../models/Inventory');
 const PurchaseOrder = require('../models/PurchaseOrder');
+const canRead = user => Boolean(user && ['Admin', 'Doctor', 'Nurse', 'Receptionist'].includes(user.role));
+const canManage = user => Boolean(user && user.role === 'Admin');
+const actorEmail = user => String(user && user.email || '').trim().toLowerCase();
 
 // GET /api/inventory/items
 r.get('/items', protect, async (req, res) => {
   try {
+    if (!canRead(req.user)) return res.status(403).json({ message: 'Access denied' });
     const q = req.query.category ? { category: req.query.category } : {};
     res.json(await Inventory.find(q).sort({ itemName: 1 }));
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 r.post('/items', protect, async (req, res) => {
-  try { res.status(201).json(await Inventory.create(req.body)); }
+  try {
+    if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    const { itemName, category, batchNo, quantity, unit, expiryDate, supplier, purchasePrice, reorderLevel, location } = req.body || {};
+    const qty = Number(quantity), price = Number(purchasePrice), reorder = Number(reorderLevel);
+    if (!String(itemName || '').trim() || !Number.isFinite(qty) || qty < 0 || !Number.isFinite(price) || price < 0 || !Number.isFinite(reorder) || reorder < 0) return res.status(400).json({ message: 'Valid item and non-negative quantity/price/reorder values are required' });
+    res.status(201).json(await Inventory.create({ itemName: String(itemName).trim().slice(0, 160), category, batchNo: String(batchNo || '').slice(0, 80), quantity: qty, unit: String(unit || '').slice(0, 40), expiryDate: String(expiryDate || '').slice(0, 10), supplier: String(supplier || '').slice(0, 160), purchasePrice: price, reorderLevel: reorder, location: String(location || '').slice(0, 120) }));
+  }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 r.patch('/items/:id', protect, async (req, res) => {
-  try { res.json(await Inventory.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
+  try {
+    if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    const allowed = ['itemName', 'category', 'batchNo', 'quantity', 'unit', 'expiryDate', 'supplier', 'purchasePrice', 'reorderLevel', 'location'];
+    const update = {};
+    for (const key of allowed) if (req.body && req.body[key] !== undefined) update[key] = req.body[key];
+    for (const key of ['quantity', 'purchasePrice', 'reorderLevel']) {
+      if (update[key] !== undefined && (!Number.isFinite(Number(update[key])) || Number(update[key]) < 0)) return res.status(400).json({ message: 'Inventory values cannot be negative or non-numeric' });
+      if (update[key] !== undefined) update[key] = Number(update[key]);
+    }
+    if (update.itemName !== undefined) update.itemName = String(update.itemName).trim().slice(0, 160);
+    const doc = await Inventory.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true });
+    if (!doc) return res.status(404).json({ message: 'Inventory item not found' });
+    res.json(doc);
+  }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 r.delete('/items/:id', protect, async (req, res) => {
-  try { await Inventory.findByIdAndDelete(req.params.id); res.json({ ok: true }); }
+  try { if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' }); const doc = await Inventory.findByIdAndDelete(req.params.id); if (!doc) return res.status(404).json({ message: 'Inventory item not found' }); res.json({ ok: true }); }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // GET /api/inventory/alerts - expiring (<=90d) + low stock
 r.get('/alerts', protect, async (req, res) => {
   try {
+    if (!canRead(req.user)) return res.status(403).json({ message: 'Access denied' });
     const items = await Inventory.find();
     const now = new Date(); now.setHours(0, 0, 0, 0);
     const expiring = [], lowStock = [];
@@ -47,6 +71,7 @@ r.get('/alerts', protect, async (req, res) => {
 // POST /api/inventory/seed-sample
 r.post('/seed-sample', protect, async (req, res) => {
   try {
+    if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' });
     if (await Inventory.countDocuments() > 0) return res.json({ seeded: 0, message: 'Already has stock' });
     const d = (n) => { const t = new Date(Date.now() + n * 86400000); return t.toISOString().slice(0, 10); };
     const S = [
@@ -68,28 +93,41 @@ r.post('/seed-sample', protect, async (req, res) => {
 
 // ---------------- Purchase Orders ----------------
 r.get('/purchase-orders', protect, async (req, res) => {
-  try { res.json(await PurchaseOrder.find().sort({ orderDate: -1 }).limit(100)); }
+  try { if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' }); res.json(await PurchaseOrder.find().sort({ orderDate: -1 }).limit(100)); }
   catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 r.post('/purchase-orders', protect, async (req, res) => {
   try {
+    if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    const { supplier, items, expectedDate, notes } = req.body || {};
+    if (!String(supplier || '').trim() || !Array.isArray(items) || !items.length || items.length > 100) return res.status(400).json({ message: 'Supplier and purchase items are required' });
+    const cleanItems = items.map(it => ({ itemName: String(it.itemName || '').trim().slice(0, 160), quantity: Number(it.quantity), unit: String(it.unit || 'pcs').slice(0, 40), rate: Number(it.rate), batchNo: String(it.batchNo || '').slice(0, 80), expiryDate: String(it.expiryDate || '').slice(0, 10) }));
+    if (cleanItems.some(it => !it.itemName || !Number.isFinite(it.quantity) || it.quantity <= 0 || !Number.isFinite(it.rate) || it.rate < 0)) return res.status(400).json({ message: 'Purchase quantities must be positive and rates non-negative' });
+    const totalAmount = cleanItems.reduce((s, it) => s + it.quantity * it.rate, 0);
+    if (!Number.isSafeInteger(Math.round(totalAmount * 100))) return res.status(400).json({ message: 'Purchase total is outside the supported range' });
     const n = await PurchaseOrder.countDocuments();
     const poNo = 'PO-' + new Date().getFullYear() + '-' + String(n + 1).padStart(4, '0');
-    const items = req.body.items || [];
-    const totalAmount = items.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.rate) || 0), 0);
-    res.status(201).json(await PurchaseOrder.create({ ...req.body, poNo, totalAmount }));
+    res.status(201).json(await PurchaseOrder.create({ supplier: String(supplier).trim().slice(0, 160), items: cleanItems, expectedDate: String(expectedDate || '').slice(0, 10), notes: String(notes || '').slice(0, 2000), orderedBy: actorEmail(req.user), poNo, totalAmount, status: 'draft' }));
   } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 r.patch('/purchase-orders/:id', protect, async (req, res) => {
-  try { res.json(await PurchaseOrder.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
+  try {
+    if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' });
+    if (!['sent', 'cancelled'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid purchase order transition' });
+    const allowedFrom = req.body.status === 'sent' ? ['draft'] : ['draft', 'sent'];
+    const doc = await PurchaseOrder.findOneAndUpdate({ _id: req.params.id, status: { $in: allowedFrom } }, { $set: { status: req.body.status } }, { new: true, runValidators: true });
+    if (!doc) return res.status(409).json({ message: 'Purchase order not found or status already changed' });
+    res.json(doc);
+  }
   catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // PATCH /api/inventory/purchase-orders/:id/receive - stock += PO items
 r.patch('/purchase-orders/:id/receive', protect, async (req, res) => {
   try {
+    if (!canManage(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ message: 'Not found' });
     for (const it of po.items) {
