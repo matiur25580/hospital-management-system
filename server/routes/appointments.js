@@ -7,6 +7,7 @@ const Patient = require('../models/Patient');
 const User = require('../models/User');
 const { sendMail } = require('../utils/notify');
 const { protect } = require('../middleware/auth');
+const { allowedAppointmentTransitions } = require('../utils/appointmentWorkflow');
 const router = express.Router();
 const clinicalRoles = ['Admin', 'Doctor', 'Nurse', 'Receptionist'];
 
@@ -66,10 +67,8 @@ router.patch('/:id/status', protect, async (req, res) => {
   const appointment = await Appointment.findById(req.params.id);
   if (!appointment) return res.status(404).json({ message: 'Appointment not found.' });
   if (req.user.role === 'Doctor' && String(appointment.doctor) !== String(req.user.id)) return res.status(403).json({ message: 'You can only update your own appointments.' });
-  const transitions = req.user.role === 'Admin'
-    ? { booked: ['in-queue', 'completed', 'cancelled'], 'in-queue': ['consulting', 'completed', 'cancelled'], consulting: ['completed', 'cancelled'], completed: [], cancelled: [] }
-    : { booked: ['in-queue', 'cancelled'], 'in-queue': ['consulting', 'cancelled'], consulting: ['completed', 'cancelled'], completed: [], cancelled: [] };
-  if (!transitions[appointment.status] || !transitions[appointment.status].includes(req.body.status)) return res.status(409).json({ message: 'Invalid appointment status transition.' });
+  const allowed = allowedAppointmentTransitions(req.user.role, appointment.status);
+  if (!allowed.includes(req.body.status)) return res.status(409).json({ message: 'Invalid appointment status transition.' });
   const updated = await Appointment.findOneAndUpdate(
     { _id: appointment._id, status: appointment.status },
     { $set: { status: req.body.status } },
