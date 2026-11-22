@@ -1,4 +1,5 @@
 const CLINICAL_ROLES = new Set(['Admin', 'Doctor', 'Nurse', 'Receptionist']);
+const clinicalRoles = [...CLINICAL_ROLES];
 
 function canReadPatientList(user) {
   return Boolean(user && (user.role === 'Patient' || CLINICAL_ROLES.has(user.role)));
@@ -10,4 +11,4 @@ function canReadPatient(user, patient) {
   return CLINICAL_ROLES.has(user.role);
 }
 
-module.exports = { canReadPatientList, canReadPatient };
+module.exports = { canReadPatientList, canReadPatient, clinicalRoles };
