@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const request = require('supertest');
 const path = require('path');
+const User = require('../models/User');
 const PORT = 5000;
 const base = `http://127.0.0.1:${PORT}`;
 let proc;
@@ -61,25 +62,30 @@ describe('Enterprise API checks', () => {
     expect(r.status).toBe(404);
   });
 
-  test('patient tokens cannot access admin or staff management endpoints', async () => {
+  test('patient database roles cannot access admin or staff management endpoints even with forged JWT role claims', async () => {
     const secret = process.env.JWT_SECRET || 'ci-test-jwt-secret-with-sufficient-entropy';
-    const token = require('jsonwebtoken').sign(
-      { id: '507f1f77bcf86cd799439011', role: 'Patient' },
-      secret,
-      { expiresIn: '5m' }
-    );
-    for (const [method, endpoint] of [
-      ['get', '/api/admin/stats'],
-      ['get', '/api/admin/users'],
-      ['post', '/api/staff/seed-management'],
-      ['post', '/api/staff/sync-users'],
-      ['post', '/api/staff/profiles'],
-      ['post', '/api/staff/salary/generate'],
-    ]) {
-      const response = await request(base)[method](endpoint)
-        .set('Authorization', 'Bearer ' + token)
-        .send({});
-      expect(response.status).toBe(403);
+    const patient = await User.create({ name: 'CI Patient', email: 'ci-patient-role-test@example.invalid', password: 'TestPassword123!', role: 'Patient' });
+    try {
+      const token = require('jsonwebtoken').sign(
+        { id: String(patient._id), role: 'Admin' },
+        secret,
+        { expiresIn: '5m' }
+      );
+      for (const [method, endpoint] of [
+        ['get', '/api/admin/stats'],
+        ['get', '/api/admin/users'],
+        ['post', '/api/staff/seed-management'],
+        ['post', '/api/staff/sync-users'],
+        ['post', '/api/staff/profiles'],
+        ['post', '/api/staff/salary/generate'],
+      ]) {
+        const response = await request(base)[method](endpoint)
+          .set('Authorization', 'Bearer ' + token)
+          .send({});
+        expect(response.status).toBe(403);
+      }
+    } finally {
+      await User.deleteOne({ _id: patient._id });
     }
   });
 
