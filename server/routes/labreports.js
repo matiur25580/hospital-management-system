@@ -1,15 +1,23 @@
 const r = require('express').Router();
 const multer = require('multer');
+const path = require('path');
 const { protect } = require('../middleware/auth');
 const LabReport = require('../models/LabReport');
 const Patient = require('../models/Patient');
 const { clinicalRoles } = require('../utils/patientAccess');
+const { canReadLabReportFile } = require('../utils/labReportFileAccess');
 
+const UPLOAD_DIR = path.resolve(__dirname, '../uploads');
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_'))
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+const allowedMimeTypes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, allowedMimeTypes.has(file.mimetype))
+});
 
 r.get('/', protect, async (req, res) => {
   try {
@@ -21,13 +29,30 @@ r.get('/', protect, async (req, res) => {
   } catch (e) { res.status(500).json({ message: 'Could not load lab reports.' }); }
 });
 
+// Attachments are served only after checking the authenticated user's patient scope or clinical role.
+r.get('/files/:filename', protect, async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    if (filename !== path.basename(filename) || !/^[a-zA-Z0-9._-]+$/.test(filename)) {
+      return res.status(400).json({ message: 'Invalid attachment name.' });
+    }
+    const fileUrl = '/api/lab-reports/files/' + filename;
+    const report = await LabReport.findOne({ fileUrl }).select('patientEmail fileUrl');
+    if (!report) return res.status(404).json({ message: 'Lab report attachment not found.' });
+    if (!canReadLabReportFile(req.user, report)) return res.status(403).json({ message: 'Access denied.' });
+    return res.sendFile(filename, { root: UPLOAD_DIR }, (error) => {
+      if (error && !res.headersSent) res.status(error.statusCode === 404 ? 404 : 500).json({ message: 'Could not load lab report attachment.' });
+    });
+  } catch (e) { return res.status(500).json({ message: 'Could not load lab report attachment.' }); }
+});
+
 r.post('/', protect, upload.single('file'), async (req, res) => {
   try {
     if (!['Admin', 'Doctor', 'Nurse'].includes(req.user.role)) return res.status(403).json({ message: 'Access denied.' });
     const patientEmail = String(req.body.patientEmail || '').trim().toLowerCase();
     if (!patientEmail || !await Patient.exists({ email: patientEmail })) return res.status(404).json({ message: 'Patient profile not found.' });
     const data = { ...req.body, patientEmail };
-    if (req.file) data.fileUrl = '/uploads/' + req.file.filename;
+    if (req.file) data.fileUrl = '/api/lab-reports/files/' + req.file.filename;
     delete data.reviewedBy;
     const l = await LabReport.create(data);
     res.status(201).json(l);
