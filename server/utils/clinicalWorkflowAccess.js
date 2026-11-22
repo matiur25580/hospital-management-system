@@ -20,7 +20,8 @@ function canManageAttendance(user) {
 function attendanceScope(user, requestedEmail) {
   if (!isStaff(user)) return null;
   const ownEmail = userEmail(user);
-  if (!requestedEmail || normalizedEmail(requestedEmail) === ownEmail) return { staffEmail: ownEmail };
+  if (!requestedEmail) return canManageAttendance(user) ? {} : { staffEmail: ownEmail };
+  if (normalizedEmail(requestedEmail) === ownEmail) return { staffEmail: ownEmail };
   return canManageAttendance(user) ? { staffEmail: normalizedEmail(requestedEmail) } : null;
 }
 
