@@ -51,13 +51,13 @@ r.post('/verify-register', async (req, res, next) => {
     }
     const rec = await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
-      return res.status(400).json({ message: 'Invalid OTP' });
+      return res.status(400).json({ message: 'Unable to verify registration details.' });
     if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
       await Otp.deleteMany({ email, purpose: 'register' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
     if (await User.findOne({ email }))
-      return res.status(400).json({ message: 'This email already registered, plz login' });
+      return res.status(400).json({ message: 'Unable to verify registration details.' });
     const role = 'Patient';
     const parts = String(name).trim().split(/\s+/);
     const fi = ((parts[0] && parts[0][0]) || 'X').toUpperCase();
