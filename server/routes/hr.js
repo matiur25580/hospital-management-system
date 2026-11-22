@@ -194,7 +194,7 @@ r.post('/recruitment/applicants/:id/hire', protect, async (req, res) => {
 
     // Account credentials are provisioned separately; never create staff accounts with shared default passwords.
     ap.stage = 'hired'; ap.decidedBy = actorEmail(req.user); await ap.save();
-    res.json({ profile, userRole: userRole || roleCategory, accountProvisioning: 'required' });
+    res.json({ profile, userRole: (userRole || roleCategory) + ' (account pending secure provisioning)', accountProvisioning: 'required' });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
