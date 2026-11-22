@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const request = require('supertest');
 const path = require('path');
 const User = require('../models/User');
+const mongoose = require('mongoose');
 const PORT = 5000;
 const base = `http://127.0.0.1:${PORT}`;
 let proc;
@@ -9,6 +10,8 @@ let startupOutput = '';
 jest.setTimeout(60000);
 
 beforeAll(async () => {
+  if (!process.env.MONGO_URI) throw new Error('MONGO_URI is required for database-backed API integration tests');
+  await mongoose.connect(process.env.MONGO_URI, { serverSelectionTimeoutMS: 10000 });
   proc = spawn('node', ['server.js'], {
     cwd: path.join(__dirname, '..'),
     env: { ...process.env, PORT: String(PORT), JWT_SECRET: process.env.JWT_SECRET || 'ci-test-jwt-secret-with-sufficient-entropy' },
@@ -34,8 +37,9 @@ beforeAll(async () => {
   throw new Error(`API server did not become ready within 30 seconds.\n${startupOutput}`);
 });
 
-afterAll(() => {
+afterAll(async () => {
   if (proc && proc.exitCode === null) proc.kill('SIGTERM');
+  if (mongoose.connection.readyState !== 0) await mongoose.disconnect();
 });
 
 describe('Enterprise API checks', () => {
