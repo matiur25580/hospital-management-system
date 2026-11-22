@@ -1,11 +1,13 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Appointment = require('../models/Appointment');
+const AppointmentCounter = require('../models/AppointmentCounter');
 const DoctorSchedule = require('../models/DoctorSchedule');
 const Patient = require('../models/Patient');
 const User = require('../models/User');
 const { sendMail } = require('../utils/notify');
 const { protect } = require('../middleware/auth');
+const { allowedAppointmentTransitions } = require('../utils/appointmentWorkflow');
 const router = express.Router();
 const clinicalRoles = ['Admin', 'Doctor', 'Nurse', 'Receptionist'];
 
@@ -28,8 +30,25 @@ router.post('/', protect, async (req, res) => {
       const leave = (doctorSchedule.leaves || []).some(item => new Date(item).toDateString() === appointmentDate.toDateString());
       if (leave || !slot) return res.status(400).json({ message: 'Doctor not available on this date.' });
     }
-    const count = await Appointment.countDocuments({ doctor, date: new Date(date) });
-    const appt = await Appointment.create({ patient: patient._id, doctor, date: new Date(date), timeSlot, symptoms, tokenNo: count + 1 });
+    const appointmentDate = new Date(date);
+    const counterFilter = { doctor, date: appointmentDate };
+    const lastAppointment = await Appointment.findOne(counterFilter).sort({ tokenNo: -1 }).select('tokenNo');
+    try {
+      await AppointmentCounter.updateOne(
+        counterFilter,
+        { $setOnInsert: { doctor, date: appointmentDate, sequence: lastAppointment ? lastAppointment.tokenNo : 0 } },
+        { upsert: true }
+      );
+    } catch (error) {
+      // Another first booking may create this unique counter concurrently.
+      if (error.code !== 11000) throw error;
+    }
+    const counter = await AppointmentCounter.findOneAndUpdate(
+      counterFilter,
+      { $inc: { sequence: 1 } },
+      { new: true }
+    );
+    const appt = await Appointment.create({ patient: patient._id, doctor, date: appointmentDate, timeSlot, symptoms: symptoms || req.body.reason, tokenNo: counter.sequence });
     try { await sendMail(patient.email, 'Appointment Confirmed', '<p>Your appointment is confirmed.</p>'); } catch (_) {}
     res.status(201).json(appt);
   } catch (e) { res.status(400).json({ message: 'Could not create appointment.' }); }
@@ -49,11 +68,15 @@ router.patch('/:id/status', protect, async (req, res) => {
   const appointment = await Appointment.findById(req.params.id);
   if (!appointment) return res.status(404).json({ message: 'Appointment not found.' });
   if (req.user.role === 'Doctor' && String(appointment.doctor) !== String(req.user.id)) return res.status(403).json({ message: 'You can only update your own appointments.' });
-  const allowed = ['booked', 'in-queue', 'consulting', 'completed', 'cancelled'];
-  if (!allowed.includes(req.body.status)) return res.status(400).json({ message: 'Invalid appointment status.' });
-  appointment.status = req.body.status;
-  await appointment.save();
-  res.json(appointment);
+  const allowed = allowedAppointmentTransitions(req.user.role, appointment.status);
+  if (!allowed.includes(req.body.status)) return res.status(409).json({ message: 'Invalid appointment status transition.' });
+  const updated = await Appointment.findOneAndUpdate(
+    { _id: appointment._id, status: appointment.status },
+    { $set: { status: req.body.status } },
+    { new: true, runValidators: true }
+  );
+  if (!updated) return res.status(409).json({ message: 'Appointment was updated by another request.' });
+  res.json(updated);
 });
 
 router.get('/', protect, async (req, res) => {
