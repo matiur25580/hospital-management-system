@@ -16,7 +16,7 @@ r.post('/checkin', protect, async (req, res) => {
     const email = userEmail(req.user);
     const rec = await Attendance.findOneAndUpdate(
       { staffEmail: email, date: todayStr() },
-      { $setOnInsert: { staffEmail: email, staffName: req.user.name || '', role: req.user.role, date: todayStr(), checkIn: new Date(), status: 'present' } },
+      { $setOnInsert: { staffEmail: email, staffName: req.user.name || userEmail(req.user), role: req.user.role, date: todayStr(), checkIn: new Date(), status: 'present' } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     if (rec.checkIn && rec.checkOut) return res.status(409).json({ message: 'Attendance already completed for today' });
