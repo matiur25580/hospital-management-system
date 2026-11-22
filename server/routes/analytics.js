@@ -10,6 +10,7 @@ try { Appointment = require('../models/Appointment'); } catch (e) { /* optional 
 // GET /api/analytics/overview
 r.get('/overview', protect, async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
     const now = new Date();
     const months = [];
     for (let i = 5; i >= 0; i--) {
