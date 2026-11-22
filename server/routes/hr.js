@@ -6,16 +6,13 @@ const JobPosting = require('../models/JobPosting');
 const Applicant = require('../models/Applicant');
 const StaffProfile = require('../models/StaffProfile');
 const User = require('../models/User');
-
-const STAFF_ROLES = new Set(['Doctor', 'Nurse', 'Receptionist']);
-const isStaff = user => Boolean(user && STAFF_ROLES.has(user.role) && user.email);
-const actorEmail = user => String(user && user.email || '').trim().toLowerCase();
+const { isStaff, canManageHR, actorEmail } = require('../utils/hrOtAccess');
 
 // ---------------- Leave ----------------
 r.get('/leave', protect, async (req, res) => {
   try {
     const q = {};
-    if (req.user.role === 'Admin') {
+    if (canManageHR(req.user)) {
       if (req.query.staffEmail) q.staffEmail = String(req.query.staffEmail).trim().toLowerCase();
     } else if (isStaff(req.user)) q.staffEmail = actorEmail(req.user);
     else return res.status(403).json({ message: 'Access denied' });
@@ -43,7 +40,7 @@ r.post('/leave/apply', protect, async (req, res) => {
 
 r.patch('/leave/:id/decide', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     if (!['approved', 'rejected'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid leave decision' });
     const doc = await LeaveRequest.findOneAndUpdate({ _id: req.params.id, status: 'pending' },
       { $set: { status: req.body.status, remarks: String(req.body.remarks || '').slice(0, 2000), decidedBy: actorEmail(req.user), decidedDate: new Date() } },
@@ -57,7 +54,7 @@ r.patch('/leave/:id/decide', protect, async (req, res) => {
 r.get('/appraisal', protect, async (req, res) => {
   try {
     const q = {};
-    if (req.user.role === 'Admin') {
+    if (canManageHR(req.user)) {
       if (req.query.staffEmail) q.staffEmail = String(req.query.staffEmail).trim().toLowerCase();
     } else if (isStaff(req.user)) q.staffEmail = actorEmail(req.user);
     else return res.status(403).json({ message: 'Access denied' });
@@ -69,7 +66,7 @@ r.get('/appraisal', protect, async (req, res) => {
 // POST upsert by staffEmail + reviewPeriod
 r.post('/appraisal', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { staffEmail, reviewPeriod, ratings, strengths, improvements, goals, status } = req.body || {};
     const normalizedStaffEmail = String(staffEmail || '').trim().toLowerCase();
     if (!normalizedStaffEmail || !/^\\d{4}-(H1|H2)$/.test(reviewPeriod || '') || !['draft', 'submitted'].includes(status)) return res.status(400).json({ message: 'Valid appraisal details are required' });
@@ -104,7 +101,7 @@ r.patch('/appraisal/:id/acknowledge', protect, async (req, res) => {
 // ---------------- Recruitment ----------------
 r.get('/recruitment/jobs', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const q = req.query.status ? { status: req.query.status } : {};
     res.json(await JobPosting.find(q).sort({ postedDate: -1 }));
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -112,7 +109,7 @@ r.get('/recruitment/jobs', protect, async (req, res) => {
 
 r.post('/recruitment/jobs', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { title, department, designation, employmentType, vacancies, qualification, experience, salaryRange, description } = req.body || {};
     const count = Number(vacancies);
     if (!String(title || '').trim() || !String(designation || '').trim() || !Number.isInteger(count) || count < 1 || count > 10000) return res.status(400).json({ message: 'Valid job details are required' });
@@ -122,7 +119,7 @@ r.post('/recruitment/jobs', protect, async (req, res) => {
 
 r.patch('/recruitment/jobs/:id', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     if (!['open', 'closed'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid job status' });
     const doc = await JobPosting.findByIdAndUpdate(req.params.id, { $set: { status: req.body.status } }, { new: true, runValidators: true });
     if (!doc) return res.status(404).json({ message: 'Job not found' });
@@ -132,7 +129,7 @@ r.patch('/recruitment/jobs/:id', protect, async (req, res) => {
 
 r.get('/recruitment/applicants', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const q = {};
     if (req.query.jobId) q.jobId = req.query.jobId;
     if (req.query.stage) q.stage = req.query.stage;
@@ -142,7 +139,7 @@ r.get('/recruitment/applicants', protect, async (req, res) => {
 
 r.post('/recruitment/applicants', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { jobId, name, email, phone, qualification, experienceYears, resumeNote } = req.body || {};
     if (!jobId || !String(name || '').trim() || !String(email || '').trim()) return res.status(400).json({ message: 'Applicant name, email and job are required' });
     const job = await JobPosting.findOne({ _id: jobId, status: 'open' });
@@ -153,7 +150,7 @@ r.post('/recruitment/applicants', protect, async (req, res) => {
 
 r.patch('/recruitment/applicants/:id', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const { stage, interviewDate, remarks } = req.body || {};
     if (!['screening', 'interview', 'offered', 'rejected'].includes(stage)) return res.status(400).json({ message: 'Invalid applicant stage' });
     const allowedFrom = { screening: ['applied'], interview: ['screening'], offered: ['interview'], rejected: ['applied', 'screening', 'interview', 'offered'] };
@@ -171,7 +168,7 @@ r.patch('/recruitment/applicants/:id', protect, async (req, res) => {
 // POST /api/hr/recruitment/applicants/:id/hire - convert to staff (+login)
 r.post('/recruitment/applicants/:id/hire', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!canManageHR(req.user)) return res.status(403).json({ message: 'Admin access required' });
     const ap = await Applicant.findById(req.params.id).populate('jobId');
     if (!ap || !ap.jobId) return res.status(404).json({ message: 'Applicant/job not found' });
     const job = ap.jobId;
