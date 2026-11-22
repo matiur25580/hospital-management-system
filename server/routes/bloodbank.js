@@ -1,67 +1,8 @@
-const r = require('express').Router();
-const { protect } = require('../middleware/auth');
-const BloodStock = require('../models/BloodStock');
-const BloodRequest = require('../models/BloodRequest');
-
-const DEFAULT_STOCK = [
-  { bloodGroup: 'A+', units: 12 }, { bloodGroup: 'A-', units: 4 },
-  { bloodGroup: 'B+', units: 14 }, { bloodGroup: 'B-', units: 3 },
-  { bloodGroup: 'AB+', units: 6 }, { bloodGroup: 'AB-', units: 2 },
-  { bloodGroup: 'O+', units: 16 }, { bloodGroup: 'O-', units: 5 }
-];
-const GROUP_ORDER = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-
-// GET /api/bloodbank/stock (auto-seeds default stock on first call)
-r.get('/stock', protect, async (req, res) => {
-  try {
-    let stock = await BloodStock.find();
-    if (!stock.length) stock = await BloodStock.insertMany(DEFAULT_STOCK);
-    stock.sort((a, b) => GROUP_ORDER.indexOf(a.bloodGroup) - GROUP_ORDER.indexOf(b.bloodGroup));
-    res.json(stock);
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// POST /api/bloodbank/stock { bloodGroup, units } - restock (adds units)
-r.post('/stock', protect, async (req, res) => {
-  try {
-    const s = await BloodStock.findOneAndUpdate(
-      { bloodGroup: req.body.bloodGroup },
-      { $inc: { units: Number(req.body.units) || 0 } },
-      { new: true, upsert: true }
-    );
-    res.json(s);
-  } catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-// GET /api/bloodbank/requests (?status=)
-r.get('/requests', protect, async (req, res) => {
-  try {
-    const q = req.query.status ? { status: req.query.status } : {};
-    res.json(await BloodRequest.find(q).sort({ date: -1 }).limit(100));
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// POST /api/bloodbank/requests - new blood request
-r.post('/requests', protect, async (req, res) => {
-  try { res.status(201).json(await BloodRequest.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-// PATCH /api/bloodbank/requests/:id - fulfill (deducts stock) / reject
-r.patch('/requests/:id', protect, async (req, res) => {
-  try {
-    const rq = await BloodRequest.findById(req.params.id);
-    if (!rq) return res.status(404).json({ message: 'Not found' });
-    if (req.body.status === 'fulfilled') {
-      const s = await BloodStock.findOne({ bloodGroup: rq.bloodGroup });
-      if (!s || s.units < rq.units) return res.status(400).json({ message: 'Not enough stock for ' + rq.bloodGroup });
-      s.units -= rq.units;
-      await s.save();
-    }
-    rq.status = req.body.status;
-    await rq.save();
-    res.json(rq);
-  } catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-module.exports = r;
+const r=require('express').Router();const {protect}=require('../middleware/auth');const BloodStock=require('../models/BloodStock');const BloodRequest=require('../models/BloodRequest');const Patient=require('../models/Patient');const GROUPS=['A+','A-','B+','B-','AB+','AB-','O+','O-'];const STAFF=new Set(['Admin','Doctor','Nurse','Receptionist']);const admin=u=>u&&u.role==='Admin';const patientEmail=u=>u&&u.role==='Patient'?String(u.email||'').trim().toLowerCase():null;const validUnits=v=>Number.isSafeInteger(Number(v))&&Number(v)>0;
+const DEFAULT=[{bloodGroup:'A+',units:12},{bloodGroup:'A-',units:4},{bloodGroup:'B+',units:14},{bloodGroup:'B-',units:3},{bloodGroup:'AB+',units:6},{bloodGroup:'AB-',units:2},{bloodGroup:'O+',units:16},{bloodGroup:'O-',units:5}];
+r.get('/stock',protect,async(req,res)=>{if(!STAFF.has(req.user.role))return res.status(403).json({message:'Access denied.'});try{let stock=await BloodStock.find();if(!stock.length)stock=await BloodStock.insertMany(DEFAULT,{ordered:false});stock.sort((a,b)=>GROUPS.indexOf(a.bloodGroup)-GROUPS.indexOf(b.bloodGroup));res.json(stock);}catch(e){res.status(500).json({message:'Could not load blood stock.'});}});
+r.post('/stock',protect,async(req,res)=>{if(!admin(req.user))return res.status(403).json({message:'Only administrators can restock blood.'});try{const group=req.body.bloodGroup,units=Number(req.body.units);if(!GROUPS.includes(group)||!validUnits(units))return res.status(400).json({message:'Valid blood group and positive whole units are required.'});const s=await BloodStock.findOneAndUpdate({bloodGroup:group},{$inc:{units}},{new:true,upsert:true,runValidators:true});res.json(s);}catch(e){res.status(400).json({message:'Could not restock blood.'});}});
+r.get('/requests',protect,async(req,res)=>{if(!STAFF.has(req.user.role)&&req.user.role!=='Patient')return res.status(403).json({message:'Access denied.'});try{const own=patientEmail(req.user),q={};if(own)q.patientEmail=own;else if(req.query.status)q.status=req.query.status;res.json(await BloodRequest.find(q).sort({date:-1}).limit(100));}catch(e){res.status(500).json({message:'Could not load blood requests.'});}});
+r.post('/requests',protect,async(req,res)=>{try{if(!STAFF.has(req.user.role)&&req.user.role!=='Patient')return res.status(403).json({message:'Access denied.'});const own=patientEmail(req.user),email=own||String(req.body.patientEmail||'').trim().toLowerCase(),units=Number(req.body.units),group=req.body.bloodGroup;if(!email||!req.body.patientName||!GROUPS.includes(group)||!validUnits(units)||!['normal','urgent','emergency'].includes(req.body.urgency||'normal'))return res.status(400).json({message:'Valid patient, blood group, urgency and units are required.'});const p=await Patient.findOne({email}).select('email name');if(!p)return res.status(404).json({message:'Patient profile not found.'});const data={patientName:own?(req.user.name||p.name):String(req.body.patientName).slice(0,120),patientEmail:email,bloodGroup:group,units,urgency:req.body.urgency||'normal',reason:String(req.body.reason||'').slice(0,1000),requestedBy:req.user.name||req.user.email,status:'pending'};res.status(201).json(await BloodRequest.create(data));}catch(e){res.status(400).json({message:'Could not create blood request.'});}});
+r.patch('/requests/:id',protect,async(req,res)=>{if(!admin(req.user))return res.status(403).json({message:'Only administrators can fulfill or reject blood requests.'});try{const status=req.body.status;if(!['fulfilled','rejected'].includes(status))return res.status(400).json({message:'Invalid request status.'});const rq=await BloodRequest.findOne({_id:req.params.id,status:'pending'});if(!rq)return res.status(404).json({message:'Pending blood request not found.'});if(status==='fulfilled'){const stock=await BloodStock.findOneAndUpdate({bloodGroup:rq.bloodGroup,units:{$gte:rq.units}},{$inc:{units:-rq.units}},{new:true});if(!stock)return res.status(409).json({message:'Insufficient blood stock.'});}const updated=await BloodRequest.findOneAndUpdate({_id:rq._id,status:'pending'},{$set:{status}},{new:true});if(!updated){if(status==='fulfilled')await BloodStock.updateOne({bloodGroup:rq.bloodGroup},{$inc:{units:rq.units}});return res.status(409).json({message:'Request changed concurrently.'});}res.json(updated);}catch(e){res.status(500).json({message:'Could not process blood request.'});}});
+module.exports=r;

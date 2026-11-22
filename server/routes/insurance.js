@@ -1,63 +1,8 @@
-const r = require('express').Router();
-const { protect } = require('../middleware/auth');
-const InsuranceClaim = require('../models/InsuranceClaim');
-
-// GET /api/insurance/summary
-r.get('/summary', protect, async (req, res) => {
-  try {
-    const all = await InsuranceClaim.find();
-    const byStatus = {};
-    let totalClaimed = 0, totalApproved = 0, totalSettled = 0;
-    const schemeMap = {};
-    all.forEach(c => {
-      byStatus[c.status] = (byStatus[c.status] || 0) + 1;
-      totalClaimed += Number(c.claimAmount) || 0;
-      if (['approved', 'settled'].includes(c.status)) totalApproved += Number(c.claimAmount) || 0;
-      if (c.status === 'settled') totalSettled += Number(c.claimAmount) || 0;
-      const s = c.scheme || 'swasthya-sathi';
-      schemeMap[s] = schemeMap[s] || { scheme: s, count: 0, claimed: 0 };
-      schemeMap[s].count++;
-      schemeMap[s].claimed += Number(c.claimAmount) || 0;
-    });
-    res.json({ total: all.length, byStatus, totalClaimed, totalApproved, totalSettled, byScheme: Object.values(schemeMap) });
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// GET /api/insurance (?status=, ?scheme=, ?patientEmail=)
-r.get('/', protect, async (req, res) => {
-  try {
-    const q = {};
-    if (req.query.status) q.status = req.query.status;
-    if (req.query.scheme) q.scheme = req.query.scheme;
-    if (req.query.patientEmail) q.patientEmail = req.query.patientEmail;
-    res.json(await InsuranceClaim.find(q).sort({ createdAt: -1 }).limit(200));
-  } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-// POST /api/insurance
-r.post('/', protect, async (req, res) => {
-  try {
-    const n = await InsuranceClaim.countDocuments();
-    const claimNo = 'CLM-' + new Date().getFullYear() + '-' + String(n + 1).padStart(4, '0');
-    const claim = await InsuranceClaim.create({
-      ...req.body, claimNo,
-      statusHistory: [{ status: 'draft', date: new Date(), remarks: 'Claim created', by: req.body.handledBy || '' }]
-    });
-    res.status(201).json(claim);
-  } catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-// PATCH /api/insurance/:id/status
-r.patch('/:id/status', protect, async (req, res) => {
-  try {
-    const c = await InsuranceClaim.findById(req.params.id);
-    if (!c) return res.status(404).json({ message: 'Not found' });
-    c.status = req.body.status;
-    c.statusHistory.push({ status: req.body.status, date: new Date(), remarks: req.body.remarks || '', by: req.body.by || '' });
-    if (req.body.remarks) c.remarks = req.body.remarks;
-    await c.save();
-    res.json(c);
-  } catch (e) { res.status(400).json({ message: e.message }); }
-});
-
-module.exports = r;
+const r=require('express').Router();const {protect}=require('../middleware/auth');const InsuranceClaim=require('../models/InsuranceClaim');
+const ADMIN=new Set(['Admin']);const STAFF=new Set(['Admin','Doctor','Nurse','Receptionist']);const patientEmail=u=>u&&u.role==='Patient'?String(u.email||'').trim().toLowerCase():null;
+const claimFields=['patientName','patientEmail','scheme','cardNo','billNo','billAmount','claimAmount','admissionDate','dischargeDate','diagnosis','documents'];const statuses=['draft','submitted','under-review','query-raised','approved','rejected','settled'];
+r.get('/summary',protect,async(req,res)=>{if(!ADMIN.has(req.user.role))return res.status(403).json({message:'Only administrators can view insurance summaries.'});try{const all=await InsuranceClaim.find().select('status claimAmount scheme');const byStatus={};let totalClaimed=0,totalApproved=0,totalSettled=0;const schemes={};for(const c of all){byStatus[c.status]=(byStatus[c.status]||0)+1;const amount=Number(c.claimAmount)||0;totalClaimed+=amount;if(['approved','settled'].includes(c.status))totalApproved+=amount;if(c.status==='settled')totalSettled+=amount;const key=c.scheme||'swasthya-sathi';schemes[key]=schemes[key]||{scheme:key,count:0,claimed:0};schemes[key].count++;schemes[key].claimed+=amount;}res.json({total:all.length,byStatus,totalClaimed,totalApproved,totalSettled,byScheme:Object.values(schemes)});}catch(e){res.status(500).json({message:'Could not load insurance summary.'});}});
+r.get('/',protect,async(req,res)=>{if(!STAFF.has(req.user.role)&&req.user.role!=='Patient')return res.status(403).json({message:'Access denied.'});try{const own=patientEmail(req.user),q={};if(own)q.patientEmail=own;else{if(req.query.status)q.status=req.query.status;if(req.query.scheme)q.scheme=req.query.scheme;if(req.query.patientEmail)q.patientEmail=String(req.query.patientEmail).trim().toLowerCase();}res.json(await InsuranceClaim.find(q).sort({createdAt:-1}).limit(200));}catch(e){res.status(500).json({message:'Could not load insurance claims.'});}});
+r.post('/',protect,async(req,res)=>{if(!ADMIN.has(req.user.role))return res.status(403).json({message:'Only administrators can create insurance claims.'});try{const data={};for(const k of claimFields)if(req.body[k]!==undefined)data[k]=req.body[k];data.patientEmail=String(data.patientEmail||'').trim().toLowerCase();data.handledBy=req.user.name||req.user.email;const n=await InsuranceClaim.countDocuments();data.claimNo='CLM-'+new Date().getFullYear()+'-'+String(n+1).padStart(4,'0');data.status='draft';data.statusHistory=[{status:'draft',date:new Date(),remarks:'Claim created',by:req.user.name||req.user.email}];const c=await InsuranceClaim.create(data);res.status(201).json(c);}catch(e){res.status(400).json({message:'Could not create insurance claim.'});}});
+r.patch('/:id/status',protect,async(req,res)=>{if(!ADMIN.has(req.user.role))return res.status(403).json({message:'Only administrators can update insurance claim status.'});try{const status=req.body.status;if(!statuses.includes(status))return res.status(400).json({message:'Invalid claim status.'});const c=await InsuranceClaim.findById(req.params.id);if(!c)return res.status(404).json({message:'Claim not found.'});const terminal=['settled','rejected'];if(terminal.includes(c.status))return res.status(409).json({message:'Claim is already closed.'});const previous=c.status;const updated=await InsuranceClaim.findOneAndUpdate({_id:c._id,status:previous},{$set:{status,remarks:req.body.remarks===undefined?c.remarks:String(req.body.remarks).slice(0,2000)},$push:{statusHistory:{status,date:new Date(),remarks:String(req.body.remarks||'').slice(0,2000),by:req.user.name||req.user.email}}},{new:true,runValidators:true});if(!updated)return res.status(409).json({message:'Claim changed concurrently. Refresh and retry.'});res.json(updated);}catch(e){res.status(400).json({message:'Could not update claim status.'});}});
+module.exports=r;
