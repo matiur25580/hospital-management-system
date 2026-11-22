@@ -5,20 +5,19 @@ const User = require('../models/User');
 const Otp = require('../models/Otp');
 const { ensurePatientProfile } = require('../utils/patientProfile');
 const { sendOtpEmail } = require('../utils/mailer');
-const signToken = (u) => jwt.sign({ id: u._id, role: u.role, email: u.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const signToken = (u) => jwt.sign({ id: u._id, role: u.role, email: u.email }, process.env.JWT_SECRET, { expiresIn: '8h' });
 
-// LOGIN (email-exists message soho)
+// LOGIN
 r.post('/login', async (req, res, next) => {
   try {
     const { email, password, role } = req.body;
     const identifier = String(email || '').trim();
-    const user = await User.findOne({ $or: [{ email: identifier }, { uniqueId: identifier.toUpperCase() }] });
-    if (!user) return res.status(404).json({ message: "This email doesn't exist, plz register first" });
-    const ok = await user.compare(password);
-    if (!ok) return res.status(401).json({ message: 'Invalid password' });
-    if (role && user.role !== role) return res.status(403).json({ message: `Role mismatch! This account is registered as '${user.role}'. Please select your correct role.` });
+    const invalidCredentials = () => res.status(401).json({ message: 'Invalid email or password' });
+    if (!identifier || !password) return invalidCredentials();
+    const user = await User.findOne({ $or: [{ email: identifier.toLowerCase() }, { uniqueId: identifier.toUpperCase() }] });
+    if (!user || !(await user.compare(password)) || (role && user.role !== role)) return invalidCredentials();
     res.json({ message: 'Login successful', token: signToken(user),
-      user: { id: user._id, name: user.fullName, email: user.email, role: user.role, uniqueId: user.uniqueId } });
+      user: { id: user._id, name: user.name || user.fullName, email: user.email, role: user.role, uniqueId: user.uniqueId } });
   } catch (e) { next(e); }
 });
 
@@ -52,13 +51,13 @@ r.post('/verify-register', async (req, res, next) => {
     }
     const rec = await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
-      return res.status(400).json({ message: 'Invalid OTP' });
+      return res.status(400).json({ message: 'Unable to verify registration details.' });
     if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
       await Otp.deleteMany({ email, purpose: 'register' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
     if (await User.findOne({ email }))
-      return res.status(400).json({ message: 'This email already registered, plz login' });
+      return res.status(400).json({ message: 'Unable to verify registration details.' });
     const role = 'Patient';
     const parts = String(name).trim().split(/\s+/);
     const fi = ((parts[0] && parts[0][0]) || 'X').toUpperCase();
