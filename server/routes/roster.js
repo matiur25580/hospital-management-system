@@ -4,7 +4,7 @@ const DutyRoster = require('../models/DutyRoster');
 const Department = require('../models/Department');
 const User = require('../models/User');
 const emailOf = user => String(user && user.email || '').trim().toLowerCase();
-const validDate = value => /^\\d{4}-\\d{2}-\\d{2}$/.test(value || '') && !Number.isNaN(new Date(value + 'T00:00:00').getTime());
+const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(new Date(value + 'T00:00:00').getTime());
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const dayName = (ds) => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
