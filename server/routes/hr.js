@@ -127,14 +127,22 @@ r.get('/recruitment/jobs', protect, async (req, res) => {
 
 r.post('/recruitment/jobs', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' }); res.status(201).json(await JobPosting.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    const { title, department, designation, employmentType, vacancies, qualification, experience, salaryRange, description } = req.body || {};
+    const count = Number(vacancies);
+    if (!String(title || '').trim() || !String(designation || '').trim() || !Number.isInteger(count) || count < 1 || count > 10000) return res.status(400).json({ message: 'Valid job details are required' });
+    res.status(201).json(await JobPosting.create({ title: String(title).trim().slice(0, 160), department: String(department || '').slice(0, 120), designation: String(designation).trim().slice(0, 120), employmentType, vacancies: count, qualification: String(qualification || '').slice(0, 500), experience: String(experience || '').slice(0, 200), salaryRange: String(salaryRange || '').slice(0, 120), description: String(description || '').slice(0, 3000), status: 'open', postedBy: actorEmail(req.user) }));
+  } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 r.patch('/recruitment/jobs/:id', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' }); res.json(await JobPosting.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    if (!['open', 'closed'].includes(req.body.status)) return res.status(400).json({ message: 'Invalid job status' });
+    const doc = await JobPosting.findByIdAndUpdate(req.params.id, { $set: { status: req.body.status } }, { new: true, runValidators: true });
+    if (!doc) return res.status(404).json({ message: 'Job not found' });
+    res.json(doc);
+  } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 r.get('/recruitment/applicants', protect, async (req, res) => {
@@ -149,14 +157,30 @@ r.get('/recruitment/applicants', protect, async (req, res) => {
 
 r.post('/recruitment/applicants', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' }); res.status(201).json(await Applicant.create(req.body)); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    const { jobId, name, email, phone, qualification, experienceYears, resumeNote } = req.body || {};
+    if (!jobId || !String(name || '').trim() || !String(email || '').trim()) return res.status(400).json({ message: 'Applicant name, email and job are required' });
+    const job = await JobPosting.findOne({ _id: jobId, status: 'open' });
+    if (!job) return res.status(404).json({ message: 'Open job not found' });
+    res.status(201).json(await Applicant.create({ jobId, name: String(name).trim().slice(0, 160), email: String(email).trim().toLowerCase(), phone: String(phone || '').slice(0, 40), qualification: String(qualification || '').slice(0, 500), experienceYears: Math.max(0, Math.min(60, Number(experienceYears) || 0)), resumeNote: String(resumeNote || '').slice(0, 2000), stage: 'applied' }));
+  } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 r.patch('/recruitment/applicants/:id', protect, async (req, res) => {
   try {
-    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' }); res.json(await Applicant.findByIdAndUpdate(req.params.id, req.body, { new: true })); }
-  catch (e) { res.status(400).json({ message: e.message }); }
+    if (req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
+    const { stage, interviewDate, remarks } = req.body || {};
+    if (!['screening', 'interview', 'offered', 'rejected'].includes(stage)) return res.status(400).json({ message: 'Invalid applicant stage' });
+    const allowedFrom = { screening: ['applied'], interview: ['screening'], offered: ['interview'], rejected: ['applied', 'screening', 'interview', 'offered'] };
+    const update = { stage, remarks: String(remarks || '').slice(0, 2000), decidedBy: actorEmail(req.user) };
+    if (stage === 'interview') {
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(interviewDate || '')) return res.status(400).json({ message: 'Valid interview date required' });
+      update.interviewDate = interviewDate;
+    }
+    const doc = await Applicant.findOneAndUpdate({ _id: req.params.id, stage: { $in: allowedFrom[stage] } }, { $set: update }, { new: true, runValidators: true });
+    if (!doc) return res.status(409).json({ message: 'Applicant not found or stage has already changed' });
+    res.json(doc);
+  } catch (e) { res.status(400).json({ message: e.message }); }
 });
 
 // POST /api/hr/recruitment/applicants/:id/hire - convert to staff (+login)
