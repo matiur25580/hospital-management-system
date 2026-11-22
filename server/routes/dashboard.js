@@ -3,8 +3,7 @@ const router = express.Router();
 const Patient = require('../models/Patient');
 const User = require('../models/User');
 const Appointment = require('../models/Appointment');
-const { protect } = require('../middleware/auth');
-const { authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 
 router.get('/stats', protect, authorize('Admin'), async (req, res) => {
   try {
