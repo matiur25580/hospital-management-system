@@ -9,7 +9,7 @@ const { protect } = require('../middleware/auth');
 const CleaningLog = require('../models/CleaningLog');
 const STAFF_ROLES = new Set(['Admin', 'Doctor', 'Nurse', 'Receptionist']);
 const actorEmail = user => String(user && user.email || '').trim().toLowerCase();
-const validDate = value => /^\\d{4}-\\d{2}-\\d{2}$/.test(value || '') && !Number.isNaN(new Date(value + 'T00:00:00').getTime());
+const validDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(new Date(value + 'T00:00:00').getTime());
 const ALL = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const MASTER = [
   { zone: 'all', task: 'sweeping', days: ALL, shift: 'morning', time: '6:00-8:00 AM', assignedTo: 'Cleaning Team A' },
