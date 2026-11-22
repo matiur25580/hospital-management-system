@@ -3,6 +3,8 @@ const { protect } = require('../middleware/auth');
 const DutyRoster = require('../models/DutyRoster');
 const Department = require('../models/Department');
 const User = require('../models/User');
+const emailOf = user => String(user && user.email || '').trim().toLowerCase();
+const validDate = value => /^\\d{4}-\\d{2}-\\d{2}$/.test(value || '') && !Number.isNaN(new Date(value + 'T00:00:00').getTime());
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const dayName = (ds) => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
@@ -10,9 +12,9 @@ const dayName = (ds) => new Date(ds + 'T00:00:00').toLocaleDateString('en-US', {
 // POST /api/roster/generate { date: YYYY-MM-DD } - auto-build full day roster
 r.post('/generate', protect, async (req, res) => {
   try {
+    if (!req.user || req.user.role !== 'Admin') return res.status(403).json({ message: 'Admin access required' });
     const date = req.body.date;
-    if (!date) return res.status(400).json({ message: 'date required' });
-    await DutyRoster.deleteMany({ date });
+    if (!validDate(date)) return res.status(400).json({ message: 'Valid date required' });
     const entries = [];
     const weekday = dayName(date);
     const dayOfYear = Math.floor((new Date(date + 'T00:00:00') - new Date(date.slice(0, 4) + '-01-01T00:00:00')) / 86400000);
@@ -54,6 +56,7 @@ r.post('/generate', protect, async (req, res) => {
       entries.push({ date, staffEmail: rcp.email, staffName: rcp.name || rcp.fullName || rcp.email, role: 'Receptionist', department: 'Front Desk', ...s });
     });
 
+    await DutyRoster.deleteMany({ date });
     if (entries.length) await DutyRoster.insertMany(entries);
     res.json({ date, count: entries.length });
   } catch (e) { res.status(500).json({ message: e.message }); }
@@ -61,7 +64,12 @@ r.post('/generate', protect, async (req, res) => {
 
 // GET /api/roster?date=YYYY-MM-DD
 r.get('/', protect, async (req, res) => {
-  try { res.json(await DutyRoster.find({ date: req.query.date }).sort({ shift: 1, role: 1, staffName: 1 })); }
+  try {
+    if (!validDate(req.query.date)) return res.status(400).json({ message: 'Valid date required' });
+    const filter = req.user.role === 'Admin' ? { date: req.query.date } : (['Doctor', 'Nurse', 'Receptionist'].includes(req.user.role) && emailOf(req.user) ? { date: req.query.date, staffEmail: emailOf(req.user) } : null);
+    if (!filter) return res.status(403).json({ message: 'Access denied' });
+    res.json(await DutyRoster.find(filter).sort({ shift: 1, role: 1, staffName: 1 }));
+  }
   catch (e) { res.status(500).json({ message: e.message }); }
 });
 
