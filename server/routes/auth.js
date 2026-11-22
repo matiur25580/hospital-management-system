@@ -24,14 +24,14 @@ r.post('/register',
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
       const { name, email, password, role } = req.body;
       if (await User.findOne({ email }))
-        return res.status(409).json({ message: 'Email already registered' });
+        return res.status(400).json({ message: 'Unable to verify registration details.' });
       const { otp } = req.body;
       const rec = await Otp.findOne({ email, password: 0, purpose: 'register' }).sort({ createdAt: -1 }).catch(()=>null);
       const rec2 = rec || await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
       // Never write OTP values or verification secrets to application logs.
       const recF = rec2;
       if (!recF || String(recF.otp).trim() !== String(otp || '').trim())
-        return res.status(400).json({ message: 'OTP verification failed' });
+        return res.status(400).json({ message: 'Unable to verify registration details.' });
       await Otp.deleteMany({ email, purpose: 'register' });
       const user = await User.create({ name, email, password, role });
       try {
