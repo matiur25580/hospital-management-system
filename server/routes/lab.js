@@ -4,6 +4,7 @@ const LabCatalog = require('../models/LabCatalog');
 const LabOrder = require('../models/LabOrder');
 const Patient = require('../models/Patient');
 const { canManageLabCatalog, canReadLabOrders, canCreateLabOrder, canProcessLabOrder } = require('../utils/labAccess');
+const { mergeLabResults } = require('../utils/labResultPolicy');
 
 const DEFAULT_TESTS = [
   { code: 'CBC', name: 'Complete Blood Count (CBC)', category: 'Hematology', price: 350, sampleType: 'Blood', normalRange: 'As per age/sex', tatHours: 4 },
@@ -117,30 +118,27 @@ r.patch('/orders/:id/collect', protect, async (req, res) => {
 r.patch('/orders/:id/report', protect, async (req, res) => {
   if (!canProcessLabOrder(req.user)) return res.status(403).json({ message: 'Access denied.' });
   try {
-    const o = await LabOrder.findById(req.params.id);
-    if (!o) return res.status(404).json({ message: 'Lab order not found.' });
-    if (!['sample-collected', 'in-progress'].includes(o.status)) {
+    const order = await LabOrder.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Lab order not found.' });
+    if (!['sample-collected', 'in-progress'].includes(order.status)) {
       return res.status(409).json({ message: 'A sample must be collected before results can be reported.' });
     }
-    if (!Array.isArray(req.body.results) || req.body.results.length > o.tests.length) {
-      return res.status(400).json({ message: 'Invalid lab results payload.' });
+    let merged;
+    try { merged = mergeLabResults(order.tests, req.body && req.body.results); }
+    catch (error) { return res.status(400).json({ message: error.message }); }
+    const nextStatus = merged.complete ? 'reported' : 'in-progress';
+    const update = { tests: merged.tests, status: nextStatus };
+    if (merged.complete) {
+      update.reportedBy = req.user.name || req.user.email || 'Lab staff';
+      update.reportedAt = new Date();
     }
-    for (const rv of req.body.results) {
-      if (!rv || typeof rv.code !== 'string' || typeof rv.result !== 'string' ||
-          rv.result.length > 500 || !['normal', 'high', 'low'].includes(rv.flag || 'normal')) {
-        return res.status(400).json({ message: 'Invalid lab result entry.' });
-      }
-      const tc = o.tests.find(test => test.code === rv.code);
-      if (!tc) return res.status(400).json({ message: 'Result contains an unknown test code.' });
-      tc.result = rv.result.trim();
-      tc.flag = rv.flag || 'normal';
-    }
-    const allDone = o.tests.length > 0 && o.tests.every(tc => tc.result && tc.result.trim() !== '');
-    o.status = allDone ? 'reported' : 'in-progress';
-    if (allDone) { o.reportedBy = req.user.name || req.user.email || 'Lab staff'; o.reportedAt = new Date(); }
-    await o.save();
-    res.json(o);
+    const updated = await LabOrder.findOneAndUpdate(
+      { _id: order._id, status: order.status },
+      { $set: update },
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ message: 'Lab order changed concurrently. Refresh and retry.' });
+    res.json(updated);
   } catch (e) { res.status(400).json({ message: 'Could not save lab results.' }); }
 });
-
 module.exports = r;
