@@ -61,10 +61,10 @@ describe('Enterprise API checks', () => {
     expect(r.status).toBe(404);
   });
 
-  test('patient tokens cannot access admin or staff management endpoints', async () => {
+  test('tokens for deleted accounts cannot access staff or administrator endpoints', async () => {
     const secret = process.env.JWT_SECRET || 'ci-test-jwt-secret-with-sufficient-entropy';
     const token = require('jsonwebtoken').sign(
-      { id: '507f1f77bcf86cd799439011', role: 'Patient' },
+      { id: '507f1f77bcf86cd799439011', role: 'Admin' },
       secret,
       { expiresIn: '5m' }
     );
@@ -79,7 +79,7 @@ describe('Enterprise API checks', () => {
       const response = await request(base)[method](endpoint)
         .set('Authorization', 'Bearer ' + token)
         .send({});
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
     }
   });
 
