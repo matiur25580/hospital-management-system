@@ -7,6 +7,7 @@ const labReportSchema = new mongoose.Schema({
   testCategory: String,
   result: String,
   normalRange: String,
+  fileUrl: String,
   isCritical: { type: Boolean, default: false },
   status: { type: String, enum: ['pending', 'reviewed', 'retest'], default: 'pending' },
   reviewedBy: String,
