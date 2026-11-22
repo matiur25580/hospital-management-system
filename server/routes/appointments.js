@@ -31,22 +31,23 @@ router.post('/', protect, async (req, res) => {
       if (leave || !slot) return res.status(400).json({ message: 'Doctor not available on this date.' });
     }
     const appointmentDate = new Date(date);
-    let counter;
+    const counterFilter = { doctor, date: appointmentDate };
+    const lastAppointment = await Appointment.findOne(counterFilter).sort({ tokenNo: -1 }).select('tokenNo');
     try {
-      counter = await AppointmentCounter.findOneAndUpdate(
-        { doctor, date: appointmentDate },
-        { $inc: { sequence: 1 } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+      await AppointmentCounter.updateOne(
+        counterFilter,
+        { $setOnInsert: { doctor, date: appointmentDate, sequence: lastAppointment ? lastAppointment.tokenNo : 0 } },
+        { upsert: true }
       );
     } catch (error) {
-      // Concurrent first bookings can race to create the unique doctor/date counter.
+      // Another first booking may create this unique counter concurrently.
       if (error.code !== 11000) throw error;
-      counter = await AppointmentCounter.findOneAndUpdate(
-        { doctor, date: appointmentDate },
-        { $inc: { sequence: 1 } },
-        { new: true }
-      );
     }
+    const counter = await AppointmentCounter.findOneAndUpdate(
+      counterFilter,
+      { $inc: { sequence: 1 } },
+      { new: true }
+    );
     const appt = await Appointment.create({ patient: patient._id, doctor, date: appointmentDate, timeSlot, symptoms: symptoms || req.body.reason, tokenNo: counter.sequence });
     try { await sendMail(patient.email, 'Appointment Confirmed', '<p>Your appointment is confirmed.</p>'); } catch (_) {}
     res.status(201).json(appt);
