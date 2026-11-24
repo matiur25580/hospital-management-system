@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import axios from 'axios';
 
+// Centralizes the signed-in user and session token so components share one authentication state.
 const AuthContext = createContext(null);
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
