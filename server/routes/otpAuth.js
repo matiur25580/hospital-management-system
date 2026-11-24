@@ -27,6 +27,9 @@ r.post('/send-otp', async (req, res, next) => {
     const { email, purpose } = req.body || {};
     if (typeof email !== 'string' || !email.trim() || !['register', 'reset'].includes(purpose))
       return res.status(400).json({ message: 'Email and valid purpose required' });
+    if (reqRole && reqRole !== 'Patient') {
+      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
+    }
     const normalizedEmail = email.trim().toLowerCase();
     const exists = await User.findOne({ email: normalizedEmail });
     const genericMessage = 'If this email is eligible, an OTP will be sent.';
@@ -55,9 +58,6 @@ r.post('/verify-register', async (req, res, next) => {
       return res.status(400).json({ message: 'Enter valid registration details and a password between 12 and 72 UTF-8 bytes.' });
     }
     const normalizedEmail = email.trim().toLowerCase();
-    if (reqRole && reqRole !== 'Patient') {
-      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
-    }
     const rec = await Otp.findOne({ email: normalizedEmail, purpose: 'register' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
       return res.status(400).json({ message: 'Unable to verify registration details.' });
