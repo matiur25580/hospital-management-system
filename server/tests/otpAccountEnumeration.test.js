@@ -6,10 +6,11 @@ jest.mock('express', () => ({
     })
   })
 }));
-jest.mock('../models/User', () => ({ findOne: jest.fn() }));
-jest.mock('../models/Otp', () => ({ findOne: jest.fn(), deleteMany: jest.fn(), create: jest.fn() }));
+jest.mock('../models/User', () => ({ findOne: jest.fn(), create: jest.fn(), deleteOne: jest.fn() }));
+jest.mock('../models/Otp', () => ({ findOne: jest.fn(), findOneAndUpdate: jest.fn(), updateOne: jest.fn(), deleteOne: jest.fn(), deleteMany: jest.fn(), create: jest.fn() }));
 jest.mock('../utils/mailer', () => ({ sendOtpEmail: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../utils/patientProfile', () => ({ ensurePatientProfile: jest.fn() }));
+const { ensurePatientProfile } = require('../utils/patientProfile');
 
 const User = require('../models/User');
 const Otp = require('../models/Otp');
@@ -28,6 +29,13 @@ function response() {
 describe('OTP request account enumeration protection', () => {
   beforeEach(() => {
     User.findOne.mockReset();
+    User.create.mockReset();
+    User.deleteOne.mockReset();
+    Otp.findOne.mockReset();
+    Otp.findOneAndUpdate.mockReset();
+    Otp.updateOne.mockReset();
+    Otp.deleteOne.mockReset();
+    ensurePatientProfile.mockReset();
     Otp.deleteMany.mockReset().mockResolvedValue({});
     Otp.create.mockReset().mockResolvedValue({});
     sendOtpEmail.mockReset().mockResolvedValue(undefined);
@@ -76,4 +84,62 @@ describe('OTP request account enumeration protection', () => {
     ]);
   });
 
+});
+
+
+describe('OTP claim recovery during account writes', () => {
+  const validRequest = {
+    name: 'Test Patient',
+    mobile: '9876543210',
+    email: 'patient@example.com',
+    dob: '01011990',
+    password: 'long-enough-password',
+    otp: '123456'
+  };
+
+  beforeEach(() => {
+    const record = { _id: 'otp-1', otp: '123456', createdAt: new Date() };
+    Otp.findOne.mockReturnValue({ sort: jest.fn().mockResolvedValue(record) });
+    Otp.findOneAndUpdate.mockResolvedValue({ _id: 'otp-1' });
+    Otp.updateOne.mockResolvedValue({});
+    Otp.deleteOne.mockResolvedValue({});
+    Otp.deleteMany.mockResolvedValue({});
+    User.findOne.mockResolvedValue(null);
+    User.create.mockResolvedValue({
+      _id: 'user-1', fullName: 'Test Patient', email: 'patient@example.com', role: 'Patient'
+    });
+    User.deleteOne.mockResolvedValue({});
+    ensurePatientProfile.mockResolvedValue({});
+  });
+
+  test('releases the OTP claim when patient profile creation fails', async () => {
+    ensurePatientProfile.mockRejectedValue(new Error('profile store unavailable'));
+    const res = response();
+    const next = jest.fn();
+
+    await global.otpHandlers['/verify-register']({ body: validRequest }, res, next);
+
+    expect(Otp.findOneAndUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: 'otp-1', otp: '123456', claimToken: { $exists: false } }),
+      expect.objectContaining({ $set: expect.objectContaining({ claimToken: expect.any(String) }) }),
+      { new: true }
+    );
+    expect(User.deleteOne).toHaveBeenCalledWith({ _id: 'user-1' });
+    expect(Otp.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: 'otp-1', claimToken: expect.any(String) }),
+      { $unset: { claimToken: 1 } }
+    );
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  test('consumes the claimed OTP only after account and patient profile creation succeed', async () => {
+    const res = response();
+    await global.otpHandlers['/verify-register']({ body: validRequest }, res, jest.fn());
+
+    expect(ensurePatientProfile).toHaveBeenCalled();
+    expect(Otp.deleteOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: 'otp-1', claimToken: expect.any(String) })
+    );
+    expect(res.statusCode).toBe(201);
+  });
 });
