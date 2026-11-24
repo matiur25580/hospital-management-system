@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET env variable is required');
+// Validates the access token, then reloads the account so deleted users cannot keep using an old token.
 exports.protect = async (req, res, next) => {
   const match = (req.headers.authorization || '').match(/^Bearer\s+(.+)$/i);
   if (!match) return res.status(401).json({ message: 'Authentication required' });
