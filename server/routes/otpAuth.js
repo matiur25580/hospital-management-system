@@ -42,6 +42,7 @@ r.post('/send-otp', async (req, res, next) => {
 
 // VERIFY + REGISTER
 r.post('/verify-register', async (req, res, next) => {
+  let otpClaim;
   try {
     const { name, mobile, email, dob, password, otp, role: reqRole } = req.body;
     if (reqRole && reqRole !== 'Patient') {
@@ -61,19 +62,30 @@ r.post('/verify-register', async (req, res, next) => {
     const rec = await Otp.findOne({ email: normalizedEmail, purpose: 'register' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
       return res.status(400).json({ message: 'Unable to verify registration details.' });
-    if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
+    if (Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
       await Otp.deleteMany({ email: normalizedEmail, purpose: 'register' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
     if (await User.findOne({ email: normalizedEmail }))
       return res.status(400).json({ message: 'Unable to verify registration details.' });
-    // Claim the one-time code atomically so concurrent requests cannot reuse it.
-    const claimedOtp = await Otp.findOneAndDelete({ _id: rec._id, otp: String(otp) });
-    if (!claimedOtp) return res.status(400).json({ message: 'Unable to verify registration details.' });
+
+    // A single request owns the OTP until its writes finish. Failed writes release the claim.
+    const claimToken = crypto.randomUUID();
+    otpClaim = { id: rec._id, token: claimToken };
+    const claimedOtp = await Otp.findOneAndUpdate(
+      { _id: rec._id, otp: String(otp), claimToken: { $exists: false } },
+      { $set: { claimToken } },
+      { new: true }
+    );
+    if (!claimedOtp) {
+      otpClaim = undefined;
+      return res.status(400).json({ message: 'Unable to verify registration details.' });
+    }
+
     const role = 'Patient';
     const parts = String(name).trim().split(/\s+/);
     const fi = ((parts[0] && parts[0][0]) || 'X').toUpperCase();
-    const li = (parts.length > 1 && parts[parts.length-1][0] ? parts[parts.length-1][0] : 'X').toUpperCase();
+    const li = (parts.length > 1 && parts[parts.length - 1][0] ? parts[parts.length - 1][0] : 'X').toUpperCase();
     const base = (role[0] + fi + li + dob).toUpperCase();
     let uniqueId = base, i = 1;
     while (await User.findOne({ uniqueId })) uniqueId = base + (i++);
@@ -84,14 +96,32 @@ r.post('/verify-register', async (req, res, next) => {
       await User.deleteOne({ _id: user._id });
       throw profileError;
     }
-    await Otp.deleteMany({ email, purpose: 'register' });
+
+    // If cleanup is temporarily unavailable, the claim still prevents reuse and TTL expires it.
+    try {
+      await Otp.deleteOne({ _id: otpClaim.id, claimToken: otpClaim.token });
+    } catch (cleanupError) {
+      console.error('Registration OTP cleanup failed:', cleanupError.message);
+    }
+    otpClaim = undefined;
+    await Otp.deleteMany({ email: normalizedEmail, purpose: 'register' });
     res.status(201).json({ message: 'Registration successful', uniqueId,
       user: { id: user._id, name: user.fullName, email: user.email, role: user.role } });
-  } catch (e) { next(e); }
+  } catch (e) {
+    if (otpClaim) {
+      try {
+        await Otp.updateOne({ _id: otpClaim.id, claimToken: otpClaim.token }, { $unset: { claimToken: 1 } });
+      } catch (releaseError) {
+        console.error('Registration OTP claim release failed:', releaseError.message);
+      }
+    }
+    next(e);
+  }
 });
 
 // RESET PASSWORD
 r.post('/reset-password', async (req, res, next) => {
+  let otpClaim;
   try {
     const { email, otp, newPassword } = req.body;
     if (typeof email !== 'string' || !email.trim() || typeof otp !== 'string' || !/^\d{6}$/.test(otp)
@@ -103,20 +133,46 @@ r.post('/reset-password', async (req, res, next) => {
     const rec = await Otp.findOne({ email: normalizedEmail, purpose: 'reset' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
       return res.status(400).json({ message: 'Invalid OTP' });
-    if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
+    if (Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
       await Otp.deleteMany({ email: normalizedEmail, purpose: 'reset' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
     const user = await User.findOne({ email: normalizedEmail });
     if (!user) return res.status(404).json({ message: "This email doesn't exist, plz register first" });
     if (await user.compare(newPassword)) return res.status(400).json({ message: 'This is your current password. Please enter a different password.' });
-    const claimedOtp = await Otp.findOneAndDelete({ _id: rec._id, otp: String(otp) });
-    if (!claimedOtp) return res.status(400).json({ message: 'Invalid OTP' });
+
+    const claimToken = crypto.randomUUID();
+    otpClaim = { id: rec._id, token: claimToken };
+    const claimedOtp = await Otp.findOneAndUpdate(
+      { _id: rec._id, otp: String(otp), claimToken: { $exists: false } },
+      { $set: { claimToken } },
+      { new: true }
+    );
+    if (!claimedOtp) {
+      otpClaim = undefined;
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
     user.password = newPassword;
     await user.save();
+    try {
+      await Otp.deleteOne({ _id: otpClaim.id, claimToken: otpClaim.token });
+    } catch (cleanupError) {
+      console.error('Password reset OTP cleanup failed:', cleanupError.message);
+    }
+    otpClaim = undefined;
     await Otp.deleteMany({ email: normalizedEmail, purpose: 'reset' });
     res.json({ message: 'Password changed successfully' });
-  } catch (e) { next(e); }
+  } catch (e) {
+    if (otpClaim) {
+      try {
+        await Otp.updateOne({ _id: otpClaim.id, claimToken: otpClaim.token }, { $unset: { claimToken: 1 } });
+      } catch (releaseError) {
+        console.error('Password reset OTP claim release failed:', releaseError.message);
+      }
+    }
+    next(e);
+  }
 });
 
 module.exports = r;
