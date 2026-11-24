@@ -1,7 +1,7 @@
 const mongoose=require('mongoose');
 const bcrypt=require('bcryptjs');
 const s=new mongoose.Schema({
- name:String, email:{type:String,unique:true}, password: String,
+ name:String, email:{type:String,unique:true}, password: { type: String, minlength: 12, validate: { validator: (value) => Buffer.byteLength(value || '', 'utf8') <= 72, message: 'Password must not exceed 72 UTF-8 bytes' } },
   mobile: { type: String },
   dob: { type: String },
  uniqueId: { type: String, unique: true, sparse: true },

@@ -3,6 +3,8 @@ const otpSchema = new mongoose.Schema({
   email: { type: String, required: true },
   otp: { type: String, required: true },
   purpose: { type: String, enum: ['register', 'reset'], required: true },
+  // Set atomically while a verification request is performing its account writes.
+  claimToken: { type: String, select: false },
   createdAt: { type: Date, default: Date.now, expires: 180 }
 });
 module.exports = mongoose.model('Otp', otpSchema);
