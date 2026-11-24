@@ -49,9 +49,9 @@ r.post('/verify-register', async (req, res, next) => {
     }
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 120
       || typeof mobile !== 'string' || !mobile.trim() || mobile.trim().length > 30
-      || typeof email !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())
-      || typeof dob !== 'string' || !/^\\d{8}$/.test(dob)
-      || typeof otp !== 'string' || !/^\\d{6}$/.test(otp)
+      || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+      || typeof dob !== 'string' || !/^\d{8}$/.test(dob)
+      || typeof otp !== 'string' || !/^\d{6}$/.test(otp)
       || typeof password !== 'string'
       || Buffer.byteLength(password, 'utf8') < 12
       || Buffer.byteLength(password, 'utf8') > 72) {
@@ -94,7 +94,7 @@ r.post('/verify-register', async (req, res, next) => {
 r.post('/reset-password', async (req, res, next) => {
   try {
     const { email, otp, newPassword } = req.body;
-    if (typeof email !== 'string' || !email.trim() || typeof otp !== 'string' || !/^\\d{6}$/.test(otp)
+    if (typeof email !== 'string' || !email.trim() || typeof otp !== 'string' || !/^\d{6}$/.test(otp)
       || typeof newPassword !== 'string' || Buffer.byteLength(newPassword, 'utf8') < 12
       || Buffer.byteLength(newPassword, 'utf8') > 72) {
       return res.status(400).json({ message: 'Enter a valid email, OTP and a password between 12 and 72 UTF-8 bytes.' });
