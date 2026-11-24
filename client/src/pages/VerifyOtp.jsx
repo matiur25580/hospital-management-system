@@ -47,8 +47,8 @@ export default function VerifyOtp() {
     if(otp.length<6){ fail('Please enter 6-digit OTP'); return; }
     setBusy(true);
     try {
-      const r = await axios.post(API + '/api/auth/verify-register', { name: reg.fullName, mobile: reg.contact, email: reg.email, dob: reg.dob, password: reg.password, role: reg.role, otp });
-      const info = { uniqueId: r.data.uniqueId, name: reg.fullName, role: reg.role };
+      const r = await axios.post(API + '/api/auth/verify-register', { name: reg.fullName, mobile: reg.contact, email: reg.email, dob: reg.dob, password: reg.password, role: 'Patient', otp });
+      const info = { uniqueId: r.data.uniqueId, name: reg.fullName, role: 'Patient' };
       sessionStorage.removeItem('hms_reg');
       toast.success(t('auth.reg_success'));
       setDone(info);
