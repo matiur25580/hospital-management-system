@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+// Verifies the Bearer JWT and attaches its decoded identity before protected route handlers run.
 const protect = (req, res, next) => {
   const h = req.headers.authorization;
   if (!h || !h.startsWith('Bearer ')) return res.status(401).json({ success: false, message: 'No token provided' });
