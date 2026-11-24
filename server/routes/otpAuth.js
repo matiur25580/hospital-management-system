@@ -104,7 +104,11 @@ r.post('/verify-register', async (req, res, next) => {
       console.error('Registration OTP cleanup failed:', cleanupError.message);
     }
     otpClaim = undefined;
-    await Otp.deleteMany({ email: normalizedEmail, purpose: 'register' });
+    try {
+      await Otp.deleteMany({ email: normalizedEmail, purpose: 'register' });
+    } catch (cleanupError) {
+      console.error('Stale registration OTP cleanup failed:', cleanupError.message);
+    }
     res.status(201).json({ message: 'Registration successful', uniqueId,
       user: { id: user._id, name: user.fullName, email: user.email, role: user.role } });
   } catch (e) {
@@ -161,7 +165,11 @@ r.post('/reset-password', async (req, res, next) => {
       console.error('Password reset OTP cleanup failed:', cleanupError.message);
     }
     otpClaim = undefined;
-    await Otp.deleteMany({ email: normalizedEmail, purpose: 'reset' });
+    try {
+      await Otp.deleteMany({ email: normalizedEmail, purpose: 'reset' });
+    } catch (cleanupError) {
+      console.error('Stale password-reset OTP cleanup failed:', cleanupError.message);
+    }
     res.json({ message: 'Password changed successfully' });
   } catch (e) {
     if (otpClaim) {
