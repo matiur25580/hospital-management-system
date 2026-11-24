@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+// Appointment records connect a patient, doctor, scheduled slot, and the visit's workflow status.
 const appointmentSchema = new mongoose.Schema({
   tokenNo: { type: Number, required: true },
   patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient', required: true },
