@@ -44,20 +44,32 @@ r.post('/send-otp', async (req, res, next) => {
 r.post('/verify-register', async (req, res, next) => {
   try {
     const { name, mobile, email, dob, password, otp, role: reqRole } = req.body;
-    if (!name || !mobile || !email || !dob || !password || !otp)
-      return res.status(400).json({ message: 'All fields are mandatory' });
+    if (typeof name !== 'string' || !name.trim() || name.trim().length > 120
+      || typeof mobile !== 'string' || !mobile.trim() || mobile.trim().length > 30
+      || typeof email !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())
+      || typeof dob !== 'string' || !/^\\d{8}$/.test(dob)
+      || typeof otp !== 'string' || !/^\\d{6}$/.test(otp)
+      || typeof password !== 'string'
+      || Buffer.byteLength(password, 'utf8') < 12
+      || Buffer.byteLength(password, 'utf8') > 72) {
+      return res.status(400).json({ message: 'Enter valid registration details and a password between 12 and 72 UTF-8 bytes.' });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
     if (reqRole && reqRole !== 'Patient') {
       return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
     }
-    const rec = await Otp.findOne({ email, purpose: 'register' }).sort({ createdAt: -1 });
+    const rec = await Otp.findOne({ email: normalizedEmail, purpose: 'register' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
       return res.status(400).json({ message: 'Unable to verify registration details.' });
     if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
-      await Otp.deleteMany({ email, purpose: 'register' });
+      await Otp.deleteMany({ email: normalizedEmail, purpose: 'register' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
-    if (await User.findOne({ email }))
+    if (await User.findOne({ email: normalizedEmail }))
       return res.status(400).json({ message: 'Unable to verify registration details.' });
+    // Claim the one-time code atomically so concurrent requests cannot reuse it.
+    const claimedOtp = await Otp.findOneAndDelete({ _id: rec._id, otp: String(otp) });
+    if (!claimedOtp) return res.status(400).json({ message: 'Unable to verify registration details.' });
     const role = 'Patient';
     const parts = String(name).trim().split(/\s+/);
     const fi = ((parts[0] && parts[0][0]) || 'X').toUpperCase();
@@ -65,7 +77,7 @@ r.post('/verify-register', async (req, res, next) => {
     const base = (role[0] + fi + li + dob).toUpperCase();
     let uniqueId = base, i = 1;
     while (await User.findOne({ uniqueId })) uniqueId = base + (i++);
-    const user = await User.create({ name, mobile, email, dob, password, role, uniqueId });
+    const user = await User.create({ name: name.trim(), mobile: mobile.trim(), email: normalizedEmail, dob, password, role, uniqueId });
     try {
       await ensurePatientProfile(user, mobile);
     } catch (profileError) {
@@ -82,21 +94,27 @@ r.post('/verify-register', async (req, res, next) => {
 r.post('/reset-password', async (req, res, next) => {
   try {
     const { email, otp, newPassword } = req.body;
-    if (!email || !otp || !newPassword)
-      return res.status(400).json({ message: 'All fields are mandatory' });
-    const rec = await Otp.findOne({ email, purpose: 'reset' }).sort({ createdAt: -1 });
+    if (typeof email !== 'string' || !email.trim() || typeof otp !== 'string' || !/^\\d{6}$/.test(otp)
+      || typeof newPassword !== 'string' || Buffer.byteLength(newPassword, 'utf8') < 12
+      || Buffer.byteLength(newPassword, 'utf8') > 72) {
+      return res.status(400).json({ message: 'Enter a valid email, OTP and a password between 12 and 72 UTF-8 bytes.' });
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    const rec = await Otp.findOne({ email: normalizedEmail, purpose: 'reset' }).sort({ createdAt: -1 });
     if (!rec || rec.otp !== String(otp))
       return res.status(400).json({ message: 'Invalid OTP' });
     if (rec && Date.now() - new Date(rec.createdAt).getTime() > 3 * 60 * 1000) {
-      await Otp.deleteMany({ email, purpose: 'reset' });
+      await Otp.deleteMany({ email: normalizedEmail, purpose: 'reset' });
       return res.status(400).json({ message: 'OTP expired. Please resend OTP.' });
     }
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) return res.status(404).json({ message: "This email doesn't exist, plz register first" });
     if (await user.compare(newPassword)) return res.status(400).json({ message: 'This is your current password. Please enter a different password.' });
+    const claimedOtp = await Otp.findOneAndDelete({ _id: rec._id, otp: String(otp) });
+    if (!claimedOtp) return res.status(400).json({ message: 'Invalid OTP' });
     user.password = newPassword;
     await user.save();
-    await Otp.deleteMany({ email, purpose: 'reset' });
+    await Otp.deleteMany({ email: normalizedEmail, purpose: 'reset' });
     res.json({ message: 'Password changed successfully' });
   } catch (e) { next(e); }
 });
