@@ -27,9 +27,6 @@ r.post('/send-otp', async (req, res, next) => {
     const { email, purpose } = req.body || {};
     if (typeof email !== 'string' || !email.trim() || !['register', 'reset'].includes(purpose))
       return res.status(400).json({ message: 'Email and valid purpose required' });
-    if (reqRole && reqRole !== 'Patient') {
-      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
-    }
     const normalizedEmail = email.trim().toLowerCase();
     const exists = await User.findOne({ email: normalizedEmail });
     const genericMessage = 'If this email is eligible, an OTP will be sent.';
@@ -47,6 +44,9 @@ r.post('/send-otp', async (req, res, next) => {
 r.post('/verify-register', async (req, res, next) => {
   try {
     const { name, mobile, email, dob, password, otp, role: reqRole } = req.body;
+    if (reqRole && reqRole !== 'Patient') {
+      return res.status(403).json({ message: 'Public registration is limited to Patient accounts. Staff accounts must be provisioned by an administrator.' });
+    }
     if (typeof name !== 'string' || !name.trim() || name.trim().length > 120
       || typeof mobile !== 'string' || !mobile.trim() || mobile.trim().length > 30
       || typeof email !== 'string' || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())
